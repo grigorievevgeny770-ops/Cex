@@ -70,3 +70,9 @@ Read-only audit: локальный OpenAPI теперь116paths/3productionv2PO
 - User removed the own/queue versus assigned-to-me switch. UI chips and TaskFilter.assignedToMe removed; Retrofit request no longer declares assignee_user_id. Server ACL/scope remains authoritative; no local page filtering or permission changes.
 - Contract tests assert no assignee parameter across three task types, both status modes and page2. Filter race test uses type selection. Independent ./scripts/verify.sh SUCCESSFUL105tests/lint/build: /tmp/workshop-all-available-review.log.
 - Updated normal debug APK installed/launched Statusok.14952739bytes SHA2560286514b7a7cb10dc9347ddf6501b961bfd721bfc66a6473576cc6f0c9a24aa0. No backend mutations.
+
+## Follow-up — debug-only action audit and clean execution details
+- User requested action history only in debug mode and removal of assignee/line IDs even in debug. Added default-collapsed debug-only audit disclosure. No dedicated history requests until expanded; refresh/pagination gated, collapse cancels/invalidate stale responses. Release/processFixture have no audit control.
+- Removed assignee/actor labels and task-line ID/role labels from detail/execution display. Fact rows use product names with non-identifier fallbacks. Operational facts and PendingRecovery unchanged. Success links renamed to task card.
+- Independent ./scripts/verify.sh SUCCESSFUL107tests/lint/APK; :app:assembleDebugAndroidTest SUCCESSFUL. Logs /tmp/workshop-debug-audit-review.log and /tmp/workshop-debug-audit-test-apk-review.log. No live write requests.
+- Updated debug APK installed/launched Statusok.14955978bytes SHA256cfecb7446393a228cc9317e13d93e36d30ed68fb584d2bfb2841812bd1049604.

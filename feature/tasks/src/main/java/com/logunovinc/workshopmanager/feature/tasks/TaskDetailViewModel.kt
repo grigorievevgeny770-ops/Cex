@@ -8,6 +8,7 @@ import com.logunovinc.workshopmanager.domain.task.*
 import com.logunovinc.workshopmanager.domain.pending.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -25,6 +26,7 @@ data class TaskDetailUiState(
     val pending: PendingCommand? = null,
     val executions: List<Execution> = emptyList(), val executionsLoading: Boolean = false,
     val executionsOffset: Long = 0, val executionsMore: Boolean = false, val executionsError: AppError? = null,
+    val debugHistoryAvailable: Boolean = false, val debugHistoryExpanded: Boolean = false,
     val history: List<HistoryEntry> = emptyList(), val historyLoading: Boolean = false,
     val historyOffset: Long = 0, val historyMore: Boolean = false, val historyError: AppError? = null,
 )
@@ -34,6 +36,7 @@ sealed interface TaskDetailIntent {
     data object DismissConfirmation : TaskDetailIntent
     data object ConfirmStart : TaskDetailIntent
     data object LoadMoreExecutions : TaskDetailIntent
+    data object ToggleDebugHistory : TaskDetailIntent
     data object LoadMoreHistory : TaskDetailIntent
 }
 @HiltViewModel
@@ -41,11 +44,14 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
     private val loadTask: LoadTaskUseCase, private val startTask: StartTaskUseCase,
     private val loadExecutions: LoadExecutionsUseCase, private val loadHistory: LoadHistoryUseCase,
     pending: PendingCommandRepository,
+    debugOptions: TaskDebugOptions = TaskDebugOptions(),
 ) : ViewModel() {
     private val taskId: Long = checkNotNull(savedStateHandle["taskId"])
-    private val mutableState = MutableStateFlow(TaskDetailUiState())
+    private val mutableState = MutableStateFlow(TaskDetailUiState(debugHistoryAvailable = debugOptions.showHistoryAvailable))
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
+    private var historyGeneration = 0L
+    private var historyJob: Job? = null
     init {
         viewModelScope.launch { pending.observe().collect { commands ->
             val current = uiState.value
@@ -64,12 +70,16 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             TaskDetailIntent.DismissConfirmation -> if (uiState.value.submission == SubmissionState.ConfirmStart) mutableState.update { it.copy(submission = SubmissionState.Idle) }
             TaskDetailIntent.ConfirmStart -> confirmStart()
             TaskDetailIntent.LoadMoreExecutions -> executions(reset = false)
+            TaskDetailIntent.ToggleDebugHistory -> toggleDebugHistory()
             TaskDetailIntent.LoadMoreHistory -> history(reset = false)
         }
     }
     private fun refresh() {
         val request = ++generation
-        mutableState.update { it.copy(loading = true, error = null, staleTask = true) }
+        historyGeneration++
+        historyJob?.cancel()
+        mutableState.update { it.copy(loading = true, error = null, staleTask = true,
+            history = emptyList(), historyLoading = false, historyOffset = 0, historyMore = false, historyError = null) }
         viewModelScope.launch {
             when (val result = loadTask(taskId)) {
                 is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, error = result.error) }
@@ -108,15 +118,33 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             }
         }
     }
+    private fun toggleDebugHistory() {
+        val current = uiState.value
+        if (!current.debugHistoryAvailable) return
+        if (current.debugHistoryExpanded) {
+            historyGeneration++
+            historyJob?.cancel()
+            mutableState.update { it.copy(debugHistoryExpanded = false, history = emptyList(), historyLoading = false,
+                historyOffset = 0, historyMore = false, historyError = null) }
+        } else {
+            mutableState.update { it.copy(debugHistoryExpanded = true) }
+            history(reset = true)
+        }
+    }
     private fun history(reset: Boolean) {
         val current = uiState.value
+        if (!current.debugHistoryAvailable || !current.debugHistoryExpanded || current.loading || current.staleTask || current.task == null) return
         if (!reset && (current.historyLoading || !current.historyMore)) return
+        if (reset) { historyGeneration++; historyJob?.cancel() }
         val request = generation
+        val auditRequest = historyGeneration
         mutableState.update { it.copy(historyLoading = true, historyError = null) }
-        viewModelScope.launch {
-            when (val result = loadHistory(taskId, if (reset) 0 else current.historyOffset)) {
-                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(historyLoading = false, historyError = result.error) }
-                is Outcome.Success -> if (request == generation) mutableState.update { it.copy(historyLoading = false,
+        historyJob = viewModelScope.launch {
+            val result = loadHistory(taskId, if (reset) 0 else current.historyOffset)
+            if (request != generation || auditRequest != historyGeneration || !uiState.value.debugHistoryExpanded) return@launch
+            when (result) {
+                is Outcome.Failure -> mutableState.update { it.copy(historyLoading = false, historyError = result.error) }
+                is Outcome.Success -> mutableState.update { it.copy(historyLoading = false,
                     history = ((if (reset) emptyList() else it.history) + result.value.items).distinctBy(HistoryEntry::id), historyOffset = result.value.nextOffset, historyMore = result.value.hasMore) }
             }
         }

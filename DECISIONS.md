@@ -28,3 +28,5 @@
 - User explicitly requested local debug login prefill. Credentials live in ignored local.properties, are compiled only into ordinary debug APK, and do not enter Git. Local host aliases/port8000 only, no automatic login. This supersedes the initial prohibition on bundled credentials for this local debug convenience; release/processFixture remain empty.
 
 - User simplified task scope: no own/queue or assigned-to-me selector. Always omit assignee_user_id, request all workshop tasks allowed to the actor by the server. Type/status filters remain.
+
+- User simplified execution details: action audit is debug-only and collapsed by default, fetched on explicit expansion. Assignee/actor labels and task-line IDs are omitted even in debug. Server payload identifiers remain intact; operational facts and durable command recovery are not debug-only.

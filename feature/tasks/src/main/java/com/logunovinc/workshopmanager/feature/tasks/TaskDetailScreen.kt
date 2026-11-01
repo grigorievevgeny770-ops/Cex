@@ -56,7 +56,6 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
             item {
                 Text(task.type.title(), style = MaterialTheme.typography.titleLarge)
                 Text(task.status.title())
-                Text(task.assigneeId?.let { "Исполнитель №$it" } ?: "Не назначено")
                 Text("Создано ${localDate(task.createdAt)} · срок ${localDate(task.dueAt)}")
                 task.startedAt?.let { Text("Начато ${localDate(it)}") }
                 task.completedAt?.let { Text("Завершено ${localDate(it)}") }
@@ -80,8 +79,15 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
             items(state.executions, key = { "execution-${it.id}" }) { execution ->
                 Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
                     Text("Факт №${execution.id} · ${localDate(execution.at)}")
-                    Text("Работник №${execution.actorId}${if (execution.final) " · окончательная приёмка" else ""}")
-                    execution.lines.forEach { Text("Строка №${it.taskLineId}: ${QuantityFormatter.format(it.actual)}${it.sheets?.let { count -> " · $count листов" }.orEmpty()}") }
+                    if (execution.final) Text("Окончательная приёмка")
+                    execution.lines.forEach { actual ->
+                        val productName = task.lines.firstOrNull { it.id == actual.taskLineId && it.productId == actual.productId }?.productName ?: when (actual.role) {
+                            "input" -> "Материал"
+                            "output" -> "Изделие"
+                            else -> "Товар"
+                        }
+                        Text("$productName: ${QuantityFormatter.format(actual.actual)}${actual.sheets?.let { count -> " · $count листов" }.orEmpty()}")
+                    }
                     if (execution.comment.isNotBlank()) Text(execution.comment)
                     execution.receiptId?.let { Text("Квитанция приёмки №$it") }
                     execution.transferId?.let { Text("Перемещение №$it") }
@@ -89,11 +95,18 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 } }
             }
             if (state.executionsMore) item { OutlinedButton(onClick = { onIntent(TaskDetailIntent.LoadMoreExecutions) }, enabled = !state.executionsLoading) { Text("Ещё факты") } }
-            item { Text("История действий", style = MaterialTheme.typography.titleLarge); state.historyError?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }; if (state.historyLoading) LinearProgressIndicator(Modifier.fillMaxWidth()) }
-            items(state.history, key = { "history-${it.id}" }) { event ->
-                Column { Text("№${event.id} · ${event.eventType} · ${localDate(event.at)}"); event.actorId?.let { Text("Работник №$it") }; event.details.forEach { Text("${it.first}: ${it.second}") } }
+            if (state.debugHistoryAvailable) {
+                item { TextButton(onClick = { onIntent(TaskDetailIntent.ToggleDebugHistory) }) {
+                    Text(if (state.debugHistoryExpanded) "Скрыть отладочную историю" else "Отладочная история")
+                } }
+                if (state.debugHistoryExpanded) {
+                    item { Text("История действий", style = MaterialTheme.typography.titleLarge); state.historyError?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }; if (state.historyLoading) LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                    items(state.history, key = { "history-${it.id}" }) { event ->
+                        Column { Text("№${event.id} · ${event.eventType} · ${localDate(event.at)}"); event.details.filterNot { it.first == "Исполнитель" }.forEach { Text("${it.first}: ${it.second}") } }
+                    }
+                    if (state.historyMore) item { OutlinedButton(onClick = { onIntent(TaskDetailIntent.LoadMoreHistory) }, enabled = !state.historyLoading) { Text("Ещё историю") } }
+                }
             }
-            if (state.historyMore) item { OutlinedButton(onClick = { onIntent(TaskDetailIntent.LoadMoreHistory) }, enabled = !state.historyLoading) { Text("Ещё историю") } }
         }
     }
     if (state.submission == SubmissionState.ConfirmStart && task != null) AlertDialog(
@@ -107,7 +120,6 @@ private fun TaskLineCard(line: TaskLine) {
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(line.productName, style = MaterialTheme.typography.titleMedium)
         line.sku?.let { Text("Артикул $it") }
-        Text("Строка №${line.id} · ${line.role}")
         Text("План: ${QuantityFormatter.format(line.planned)} ${line.baseUnit.orEmpty()}")
         Text("Факт: ${QuantityFormatter.format(line.actual)} · Осталось: ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
         line.plannedUnit?.let { Text("В ${line.unitName.orEmpty()}: план ${QuantityFormatter.format(it)}, факт ${line.actualUnit?.let(QuantityFormatter::format) ?: "—"}, осталось ${line.remainingUnit?.let(QuantityFormatter::format) ?: "—"}") }

@@ -25,6 +25,8 @@ class TasksViewModelsTest {
         var reads = 0
         var starts = 0
         var taskCalls = 0
+        var historyReads = 0
+        var auditing: suspend (Long) -> Outcome<Page<HistoryEntry>> = { offset -> Outcome.Success(Page((offset until minOf(offset + 50, 55)).map { HistoryEntry(2000 + it, "executed", 42, Instant.EPOCH, emptyList()) }, 55, 50, offset)) }
         var listing: suspend (TaskFilter, Long) -> Outcome<Page<Task>> = { _, offset -> Outcome.Success(Page(listOf(sampleTask()), 1, 50, offset)) }
         var reading: suspend () -> Outcome<Task> = { Outcome.Success(sampleTask()) }
         var starting: suspend () -> CommandOutcome = { CommandOutcome.Confirmed(CommandConfirmation("id", 101, 4, null, false)) }
@@ -37,7 +39,7 @@ class TasksViewModelsTest {
         override suspend fun start(task: Task): CommandOutcome { starts++; return starting() }
         override suspend fun executions(taskId: Long, limit: Int, offset: Long): Outcome<Page<Execution>> = Outcome.Success(Page((offset until minOf(offset + limit, 55)).map { Execution(1000 + it, taskId, 42, Instant.EPOCH, "", false, emptyList(), null, null, null) }, 55, limit, offset))
         override suspend fun execution(taskId: Long, executionId: Long): Outcome<Execution> = Outcome.Failure(AppError(ErrorKind.NOT_FOUND, "none"))
-        override suspend fun history(taskId: Long, limit: Int, offset: Long): Outcome<Page<HistoryEntry>> = Outcome.Success(Page((offset until minOf(offset + limit, 55)).map { HistoryEntry(2000 + it, "executed", 42, Instant.EPOCH, emptyList()) }, 55, limit, offset))
+        override suspend fun history(taskId: Long, limit: Int, offset: Long): Outcome<Page<HistoryEntry>> { historyReads++; return auditing(offset) }
     }
     @Test fun lateResponseOfOldFilterCannotReplaceNewFilter() = runTest(dispatcher) {
         val tasks = Tasks()
@@ -80,7 +82,7 @@ class TasksViewModelsTest {
         assertNull(vm.uiState.value.warehouse)
         assertEquals("WORKSHOP_MISSING", vm.uiState.value.error?.code)
     }
-    private fun detail(tasks: Tasks) = TaskDetailViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), StartTaskUseCase(tasks), LoadExecutionsUseCase(tasks), LoadHistoryUseCase(tasks), object : PendingCommandRepository { override fun observe() = kotlinx.coroutines.flow.flowOf(emptyList<PendingCommand>()); override suspend fun retry(commandId: String): CommandOutcome = error("unused") })
+    private fun detail(tasks: Tasks, debug: Boolean = false) = TaskDetailViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), StartTaskUseCase(tasks), LoadExecutionsUseCase(tasks), LoadHistoryUseCase(tasks), object : PendingCommandRepository { override fun observe() = kotlinx.coroutines.flow.flowOf(emptyList<PendingCommand>()); override suspend fun retry(commandId: String): CommandOutcome = error("unused") }, TaskDebugOptions(showHistoryAvailable = debug))
     @Test fun detailDoesNotAutomaticallyStartAndIgnoresDuplicateIntentsInFlight() = runTest(dispatcher) {
         val tasks = Tasks()
         val gate = CompletableDeferred<Unit>()
@@ -128,9 +130,18 @@ class TasksViewModelsTest {
         assertEquals("VERSION_CONFLICT", (vm.uiState.value.submission as SubmissionState.Rejected).error.code)
     }
     @Test fun dedicatedHistoryAndExecutionPagesKeepAllFiftyFiveDistinctIds() = runTest(dispatcher) {
-        val vm = detail(Tasks())
+        val tasks = Tasks()
+        val vm = detail(tasks, debug = true)
         runCurrent()
         assertEquals(50, vm.uiState.value.executions.size)
+        assertFalse(vm.uiState.value.debugHistoryExpanded)
+        assertTrue(vm.uiState.value.history.isEmpty())
+        assertEquals(0, tasks.historyReads)
+        vm.onIntent(TaskDetailIntent.LoadMoreHistory)
+        runCurrent()
+        assertEquals(0, tasks.historyReads)
+        vm.onIntent(TaskDetailIntent.ToggleDebugHistory)
+        runCurrent()
         assertEquals(50, vm.uiState.value.history.size)
         vm.onIntent(TaskDetailIntent.LoadMoreExecutions)
         vm.onIntent(TaskDetailIntent.LoadMoreHistory)
@@ -142,4 +153,46 @@ class TasksViewModelsTest {
         assertFalse(vm.uiState.value.executionsMore)
         assertFalse(vm.uiState.value.historyMore)
     }
+    @Test fun auditUnavailableIgnoresDisclosureAndPaginationWhileFactsRemainVisible() = runTest(dispatcher) {
+        val tasks = Tasks()
+        val vm = detail(tasks)
+        runCurrent()
+        vm.onIntent(TaskDetailIntent.ToggleDebugHistory)
+        vm.onIntent(TaskDetailIntent.LoadMoreHistory)
+        vm.onIntent(TaskDetailIntent.Refresh)
+        runCurrent()
+        assertFalse(vm.uiState.value.debugHistoryAvailable)
+        assertFalse(vm.uiState.value.debugHistoryExpanded)
+        assertTrue(vm.uiState.value.history.isEmpty())
+        assertEquals(0, tasks.historyReads)
+        assertEquals(50, vm.uiState.value.executions.size)
+    }
+    @Test fun collapsingAuditInvalidatesLateReadsAndReopeningFetchesFreshPage() = runTest(dispatcher) {
+        val tasks = Tasks()
+        val old = CompletableDeferred<Unit>()
+        tasks.auditing = { offset -> withContext(NonCancellable) { old.await(); Outcome.Success(Page(listOf(HistoryEntry(2000, "old", 42, Instant.EPOCH, emptyList())), 1, 50, offset)) } }
+        val vm = detail(tasks, debug = true)
+        runCurrent()
+        vm.onIntent(TaskDetailIntent.ToggleDebugHistory)
+        runCurrent()
+        assertTrue(vm.uiState.value.historyLoading)
+        vm.onIntent(TaskDetailIntent.ToggleDebugHistory)
+        assertFalse(vm.uiState.value.debugHistoryExpanded)
+        assertTrue(vm.uiState.value.history.isEmpty())
+        vm.onIntent(TaskDetailIntent.LoadMoreHistory)
+        tasks.auditing = { offset -> Outcome.Success(Page(listOf(HistoryEntry(9000, "fresh", null, Instant.EPOCH, emptyList())), 1, 50, offset)) }
+        vm.onIntent(TaskDetailIntent.ToggleDebugHistory)
+        runCurrent()
+        assertEquals(listOf(9000L), vm.uiState.value.history.map(HistoryEntry::id))
+        old.complete(Unit)
+        runCurrent()
+        assertEquals(listOf(9000L), vm.uiState.value.history.map(HistoryEntry::id))
+        vm.onIntent(TaskDetailIntent.ToggleDebugHistory)
+        vm.onIntent(TaskDetailIntent.Refresh)
+        runCurrent()
+        assertFalse(vm.uiState.value.debugHistoryExpanded)
+        assertTrue(vm.uiState.value.history.isEmpty())
+        assertEquals(2, tasks.historyReads)
+    }
+
 }

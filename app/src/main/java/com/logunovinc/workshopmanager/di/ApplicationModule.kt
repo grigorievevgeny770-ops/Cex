@@ -3,6 +3,7 @@ package com.logunovinc.workshopmanager.di
 import android.content.Context
 import com.logunovinc.workshopmanager.BuildConfig
 import com.logunovinc.workshopmanager.feature.auth.AuthPrefill
+import com.logunovinc.workshopmanager.feature.tasks.TaskDebugOptions
 import com.logunovinc.workshopmanager.data.local.*
 import com.logunovinc.workshopmanager.data.remote.*
 import com.logunovinc.workshopmanager.data.repository.RealAuthRepository
@@ -29,6 +30,7 @@ object ApplicationModule {
         RealAuthRepository(settings, factory, errors, BuildConfig.DEBUG, DEFAULT_URL)
     @Provides @Singleton fun auth(repository: RealAuthRepository): AuthRepository = repository
     @Provides @Singleton fun currentSession(repository: RealAuthRepository): CurrentSession = repository
+    @Provides fun taskDebugOptions() = TaskDebugOptions(showHistoryAvailable = BuildConfig.DEBUG && BuildConfig.BUILD_TYPE == "debug")
     @Provides fun authPrefill() = AuthPrefill(BuildConfig.DEBUG_PREFILL_LOGIN, BuildConfig.DEBUG_PREFILL_PASSWORD)
     @Provides fun login(repository: AuthRepository) = LoginUseCase(repository)
     @Provides fun restore(repository: AuthRepository) = RestoreSessionUseCase(repository)

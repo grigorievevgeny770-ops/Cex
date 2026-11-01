@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 952 739 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 955 978 байт.
 
-SHA256: `0286514b7a7cb10dc9347ddf6501b961bfd721bfc66a6473576cc6f0c9a24aa0`.
+SHA256: `cfecb7446393a228cc9317e13d93e36d30ed68fb584d2bfb2841812bd1049604`.
 
 APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
 
@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 105 JVM-тест, 4 device-теста: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 107 JVM-тест, 4 device-теста: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -58,3 +58,5 @@ Push, публикация APK и server deployment не выполнялись.
 Debug-prefill enabled by the user for local port8000 only. Values come from ignored local.properties and are included in ordinary debug APK only; no auto-login. Release/processFixture defaults stay empty. Prefill regression tests and test-APK compilation passed; emulator fields verified without submitting login.
 
 Task assignee filters removed at user request. Requests always omit assignee_user_id; the server determines the available workshop scope. Type/status filters and server pagination remain. Independent verify passed105tests/lint/build; updated APK installed and launched.
+
+Action audit is now debug-only, collapsed by default and loaded only when expanded. Assignee/actor labels and task-line identifiers are removed from task detail and execution display, including debug. Operational facts and command recovery remain available. Independent107tests/lint/APK/test-APK build passed.

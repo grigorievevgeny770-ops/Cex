@@ -35,7 +35,7 @@ fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingInt
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
             when (val result = state.result) {
-                is ExecutionResultState.Confirmed -> { Text("Действие подтверждено сервером · версия ${result.receipt.taskVersion}", color = MaterialTheme.colorScheme.primary); TextButton(onClick = onDetailClick) { Text("Карточка и история") } }
+                is ExecutionResultState.Confirmed -> { Text("Действие подтверждено сервером · версия ${result.receipt.taskVersion}", color = MaterialTheme.colorScheme.primary); TextButton(onClick = onDetailClick) { Text("Карточка задания") } }
                 is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.message}", color = MaterialTheme.colorScheme.error); TextButton(onClick = onRecoveryClick) { Text("Восстановить исходный запрос") } }
                 is ExecutionResultState.Rejected -> Text(result.error.message, color = MaterialTheme.colorScheme.error)
                 ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
