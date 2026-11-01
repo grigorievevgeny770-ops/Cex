@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 15 150 467 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 767 389 байт.
 
-SHA256: `be38df6f720fc429c5a4ca6b86c432a815069f9cbf5ec065b9404249dbeff7b2`.
+SHA256: `ed372bd74ca733d90b2794ac740b250c216d77fc30a7687c75c496d7e96267cf`.
 
 APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
 
@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 124 JVM-теста, 6 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 125 JVM-тестов, 7 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -101,3 +101,8 @@ attestation привязывает UI к owned marker/revision до входа. 
 Ошибки сети/прав/версий и Room reopen проверены синтетическими тестами, без внедрения отказов в пользовательский backend. Админские замечания и Telegram в этот объём не входят. Общий backend/его БД не изменялись.
 
 Прежний actual-backend E2E независимо повторён после изменений: /tmp/tseh-close-root-baseline-review/result.json PASS. Финальный root verify: /tmp/tseh-close-root-final-check.log; APK переустановлен и запущен как обычное приложение (без instrumentation). Текущий локальный commit: `git log -1 --oneline`; новый этап не требует дополнительных согласований. Удалённое окружение этим запуском не проверялось.
+
+## Завершение приёмки из карточки
+Добавлена отдельная кнопка «Завершить приёмку»: открывает существующий final receive workflow с фактом текущего шага и причиной недостачи. Нулевой новый факт допустим, предыдущие поступления сохраняются; close-incomplete для RECEIVE не вызывается. Навигация и rotation не отправляют команды.
+
+Проверено: 125 JVM, 7 connected, lint/assembleDebug; /tmp/tseh-final-receive-verify2.log. Независимый root verify: /tmp/tseh-receive-root-verify.log BUILD SUCCESSFUL. Compose: partial4 → zero final с причиной, exact lines[] и transfer version3; факты4/remaining6 сохранены. Actual backend: /tmp/tseh-final-receive-real-run1/result.json PASS, revision565e9e69881bb36eb61507f4d02a4e10c64fd96d, partial4 → новая кнопка → final5/shortage1. Только owned SQLite fixture, без пользовательских складских движений.

@@ -32,6 +32,7 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
         item {
             Text("Приёмка · №${task?.id ?: ""}", style = MaterialTheme.typography.headlineMedium)
             Text("Введите только фактически прибывшее в этом шаге количество. Ранее принятые товары повторно не вводите")
+            if (state.final) Text("Можно завершить, даже если в этом шаге ничего не прибыло; ранее принятое сохранится, оставшееся станет недостачей для разбора менеджером")
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
             when (val result = state.result) {
@@ -50,7 +51,7 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
             val sheets = line.plannedSheets != null || line.remainingSheets != null
             Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(line.productName, style = MaterialTheme.typography.titleMedium)
-                Text("Уже принято ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
+                Text("План ${QuantityFormatter.format(line.planned)} · уже принято ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
                 if (sheets) {
                     Text("Листы: принято ${line.actualSheets ?: "—"} · осталось ${line.remainingSheets ?: "—"}")
                     line.sheetLength?.let { Text("Длина по заданию ${QuantityFormatter.format(it)} м") }
@@ -69,6 +70,11 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
     state.review?.let { review ->
         AlertDialog(onDismissRequest = { onIntent(ReceiveExecutionIntent.DismissReview) }, title = { Text(if (review.final) "Завершить приёмку?" else "Принять эту часть?") },
             text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (review.final) task?.lines?.forEach { line ->
+                    Text(line.productName)
+                    Text("План ${QuantityFormatter.format(line.planned)} · ранее принято ${QuantityFormatter.format(line.actual)} · остаток до этого шага ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
+                    line.remainingSheets?.let { remaining -> Text("Листы: план ${line.plannedSheets ?: "—"} · ранее принято ${line.actualSheets ?: "—"} · остаток до этого шага $remaining") }
+                }
                 if (review.lines.isEmpty()) Text("В этом шаге не прибыло ни одного товара")
                 review.lines.forEach { actual ->
                     val line = task?.lines?.firstOrNull { it.id == actual.taskLineId }

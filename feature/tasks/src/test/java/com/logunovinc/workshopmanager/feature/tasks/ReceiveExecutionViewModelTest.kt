@@ -41,7 +41,7 @@ class ReceiveExecutionViewModelTest {
         override fun observe() = commands
         override suspend fun retry(commandId: String): CommandOutcome = error("retry is explicit recovery screen only")
     }
-    private fun vm(tasks: Tasks, pending: Pending) = ReceiveExecutionViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), PrepareReceiveUseCase(), ExecuteReceiveUseCase(tasks), pending)
+    private fun vm(tasks: Tasks, pending: Pending, finalMode: Boolean = false) = ReceiveExecutionViewModel(SavedStateHandle(mapOf("taskId" to 101L,"final" to finalMode)), LoadTaskUseCase(tasks), PrepareReceiveUseCase(), ExecuteReceiveUseCase(tasks), pending)
     @Test fun inputAndReviewNeverWriteAndDoubleConfirmUsesOneImmutableStep() = runTest(dispatcher) {
         val tasks = Tasks()
         val gate = CompletableDeferred<Unit>()
@@ -102,4 +102,27 @@ class ReceiveExecutionViewModelTest {
         assertFalse(vm.uiState.value.editable)
         assertEquals(1, tasks.count)
     }
+    @Test fun finalNavigationOnlyInitializesFormAndZeroFinalPreservesPreviousServerFacts() = runTest(dispatcher) {
+        val tasks=Tasks()
+        tasks.current=tasks.current.copy(lines=tasks.current.lines.map { it.copy(actual=BigDecimal("4"),remaining=BigDecimal("6")) })
+        val pending=Pending()
+        val vm=vm(tasks,pending,finalMode=true);runCurrent()
+        assertTrue(vm.uiState.value.final);assertEquals(0,tasks.count)
+        assertEquals("",vm.uiState.value.inputs.single().quantity)
+        vm.onIntent(ReceiveExecutionIntent.Refresh);runCurrent();assertTrue(vm.uiState.value.final);assertEquals(0,tasks.count)
+        val recreated=vm(tasks,pending,finalMode=true);runCurrent();assertTrue(recreated.uiState.value.final);assertEquals(0,tasks.count)
+        recreated.onIntent(ReceiveExecutionIntent.ReviewClick);runCurrent();assertNotNull(recreated.uiState.value.error);assertEquals(0,tasks.count)
+        recreated.onIntent(ReceiveExecutionIntent.ReasonChanged("Оставшаяся часть не прибыла"));recreated.onIntent(ReceiveExecutionIntent.ReviewClick);runCurrent()
+        assertTrue(recreated.uiState.value.review!!.final);assertTrue(recreated.uiState.value.review!!.lines.isEmpty());assertTrue(recreated.uiState.value.review!!.shortage)
+        assertEquals(0,tasks.count)
+        tasks.receiveResult={
+            tasks.current=tasks.current.copy(isCompleted=true,outcome="shortage",version=4)
+            CommandOutcome.Confirmed(CommandConfirmation("zero-final",101,4,5002,false))
+        }
+        recreated.onIntent(ReceiveExecutionIntent.ConfirmClick);recreated.onIntent(ReceiveExecutionIntent.ConfirmClick);runCurrent()
+        assertEquals(1,tasks.count);assertTrue(tasks.command!!.final);assertTrue(tasks.command!!.lines.isEmpty())
+        assertEquals("4",recreated.uiState.value.task!!.lines.single().actual.toPlainString());assertEquals("6",recreated.uiState.value.task!!.lines.single().remaining.toPlainString())
+        assertEquals("shortage",recreated.uiState.value.task!!.outcome);assertFalse(recreated.uiState.value.final)
+    }
+
 }

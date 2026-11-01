@@ -32,12 +32,14 @@ class SyntheticWorkshopBackend : AutoCloseable {
     val previews = AtomicInteger()
     val stockReads = AtomicInteger()
     @Volatile var lastManufacturingBody = ""
+    @Volatile var receiveFinal = false
+    val receiveBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
     private var accepted = 0
     private var version = 2L
     private val receipts = mutableMapOf<String, String>()
     private fun fixture(name: String) = InstrumentationRegistry.getInstrumentation().context.assets.open("production-v2/$name.json").bufferedReader().use { it.readText() }
     private fun response(body: String, status: Int = 200) = MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json").setBody(body)
-    private fun task(): String = if(closeScenario) closeTask() else if (prototypeScenario) fixture(when (manufacturingExecutions.get()) { 0 -> "prototype_task"; 1 -> "prototype_ready_task"; else -> "prototype_after_next3" }) else """{"id":101,"type":"RECEIVE_GOODS","status":"${if (accepted == 0) "new" else "partially_completed"}","version":$version,"warehouse_id":42,"assignee_user_id":${if (accepted == 0) "null" else "42"},"created_by":1,"created_at":"2026-11-01T12:00:00Z","comment":"Synthetic UI task","transfer_version":$version,"allowed_actions":["start","execute"],"lines":[{"id":1001,"product_id":301,"product_name":"Материал","role":"receive","base_unit":"шт","planned_qty":"10","actual_qty":"$accepted","remaining_qty":"${10 - accepted}"}]}"""
+    private fun task(): String = if(closeScenario) closeTask() else if (prototypeScenario) fixture(when (manufacturingExecutions.get()) { 0 -> "prototype_task"; 1 -> "prototype_ready_task"; else -> "prototype_after_next3" }) else """{"id":101,"type":"RECEIVE_GOODS","status":"${if (receiveFinal) "completed" else if (accepted == 0) "new" else "partially_completed"}","version":$version,"warehouse_id":42,"assignee_user_id":${if (accepted == 0) "null" else "42"},"created_by":1,"created_at":"2026-11-01T12:00:00Z","comment":"Synthetic UI task","transfer_version":$version,"outcome":${if(receiveFinal && accepted<10) "\"shortage\"" else "null"},"allowed_actions":["start","execute"],"lines":[{"id":1001,"product_id":301,"product_name":"Материал","role":"receive","base_unit":"шт","planned_qty":"10","actual_qty":"$accepted","remaining_qty":"${10 - accepted}"}]}"""
     private fun page(item: String, total: Int = 1) = """{"items":[$item],"total":$total,"limit":50,"offset":0}"""
     init {
         server.dispatcher = object : Dispatcher() {
@@ -61,11 +63,13 @@ class SyntheticWorkshopBackend : AutoCloseable {
                 if (path == "/api/workshop/tasks/101") return response(task())
                 if (path == "/api/workshop/tasks/101/start") { starts.incrementAndGet(); return response("""{"code":"TEST_ERROR","message":"Smoke must not automatically start"}""", 409) }
                 if (path == "/api/workshop/tasks/101/executions" && request.method == "POST") {
-                    val body = Json.parseToJsonElement(request.body.readUtf8()).jsonObject
+                    val rawBody=request.body.readUtf8();receiveBodies += rawBody
+                    val body = Json.parseToJsonElement(rawBody).jsonObject
                     val token = body["client_token"]!!.jsonPrimitive.content
                     receipts[token]?.let { return response(it) }
                     executions.incrementAndGet()
                     accepted += body["lines"]!!.jsonArray.sumOf { it.jsonObject["qty"]!!.jsonPrimitive.content.toInt() }
+                    receiveFinal=body["final"]?.jsonPrimitive?.boolean ?: false
                     version++
                     val ack = """{"result":{"id":101,"execution_id":5001,"duplicate":false},"task":${task()}}"""
                     receipts[token] = ack

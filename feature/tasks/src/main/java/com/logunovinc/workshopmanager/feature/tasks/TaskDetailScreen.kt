@@ -21,7 +21,7 @@ import com.logunovinc.workshopmanager.core.ui.*
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(viewModel, lifecycle) {
@@ -30,10 +30,10 @@ fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Un
             awaitCancellation()
         }
     }
-    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onDispatchClick, onManufacturingClick, onRecoveryClick)
+    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onDispatchClick, onManufacturingClick, onFinishReceiveClick, onRecoveryClick)
 }
 @Composable
-fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val task = state.task
@@ -72,6 +72,7 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.executionAvailable) { Text("Отправить товары") }
                 if (task.canCloseIncomplete) OutlinedButton(onClick = { onIntent(TaskDetailIntent.CloseIncompleteClick) }, modifier = Modifier.testTag("task-close-incomplete"), enabled = state.closeAvailable) { Text("Завершить без полного выполнения") }
                 if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, modifier = Modifier.testTag("task-receive"), enabled = state.executionAvailable) { Text("Принять товары") }
+                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) OutlinedButton(onClick = { onFinishReceiveClick(task.id) }, modifier = Modifier.testTag("task-finish-receive"), enabled = state.executionAvailable) { Text("Завершить приёмку") }
             }
             items(task.lines, key = { "line-${it.id}" }) { line -> TaskLineCard(line) }
             items(task.discrepancies, key = { "difference-${it.id}" }) { discrepancy ->

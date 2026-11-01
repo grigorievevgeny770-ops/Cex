@@ -92,12 +92,12 @@ class RealBackendConnectedTest {
         }
     }
     private fun receive(qty: String, final: Boolean) {
-        tagged("task-detail-list", "task-receive")
+        tagged("task-detail-list", if(final) "task-finish-receive" else "task-receive")
         val line = task("receive").getValue("lines").jsonArray[0].jsonObject.getValue("id").jsonPrimitive.long
         val field = "receive-qty-$line"
         tagged("receive-list",field);compose.onNodeWithTag(field).performTextReplacement(qty)
         if(final) {
-            click("receive-list", isToggleable()); click("receive-list", hasText("Причина недостачи, если она есть"))
+            click("receive-list", hasText("Причина недостачи, если она есть"))
             compose.onNodeWithText("Причина недостачи, если она есть").performTextInput("Одна единица не прибыла")
         }
         tagged("receive-list", "receive-review"); waitText(if(final) "Завершить приёмку?" else "Принять эту часть?")

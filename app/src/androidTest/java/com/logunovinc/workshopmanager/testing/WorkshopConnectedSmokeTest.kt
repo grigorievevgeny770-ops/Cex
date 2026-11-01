@@ -121,4 +121,29 @@ class WorkshopConnectedSmokeTest {
         waitText("изготовлено 5 · осталось 5", substring = true)
         screenshot("manufacturing-by-recipe-success")
     }
+    @Test fun finalReceiveEntryPreservesPreviousFourAndExplicitZeroFinalSendsOnlyReceiveCommand() {
+        login();compose.onNodeWithText("№101 · Приёмка").performScrollTo().performClick()
+        clickInList("task-detail-list","task-receive")
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("receive-qty-1001").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("receive-list").performScrollToNode(hasTestTag("receive-qty-1001"));compose.onNodeWithTag("receive-qty-1001").performTextInput("4")
+        clickInList("receive-list","receive-review");waitText("Принять эту часть?");compose.onNodeWithTag("receive-confirm").performClick()
+        compose.waitUntil(15_000) { backend.backend.executions.get()==1 }
+        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Карточка задания");compose.onNodeWithText("Карточка задания").performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-finish-receive").fetchSemanticsNodes().isNotEmpty() }
+        clickInList("task-detail-list","task-finish-receive")
+        waitText("Можно завершить, даже если",true);assertEquals(1,backend.backend.executions.get())
+        compose.activityRule.scenario.recreate();waitText("Можно завершить, даже если",true);assertEquals(1,backend.backend.executions.get())
+        compose.onNodeWithTag("receive-list").performScrollToNode(hasText("Причина недостачи, если она есть"));compose.onNodeWithText("Причина недостачи, если она есть").performTextInput("Остальная часть не прибыла")
+        clickInList("receive-list","receive-review");waitText("Завершить приёмку?")
+        waitText("ранее принято 4 · остаток до этого шага 6",true)
+        assertEquals(1,backend.backend.executions.get());compose.onNodeWithTag("receive-confirm").performClick()
+        compose.waitUntil(15_000) { backend.backend.executions.get()==2 }
+        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Приёмка завершена с недостачей",true)
+        val payload=Json.parseToJsonElement(backend.backend.receiveBodies.last()).jsonObject
+        assertEquals("RECEIVE_GOODS",payload["type"]!!.jsonPrimitive.content);assertTrue(payload["final"]!!.jsonPrimitive.boolean)
+        assertTrue(payload["lines"]!!.jsonArray.isEmpty());assertEquals(3L,payload["expected_transfer_version"]!!.jsonPrimitive.long)
+        assertEquals("Остальная часть не прибыла",payload["reason"]!!.jsonPrimitive.content)
+        assertEquals(0,backend.backend.closeAttempts.get());assertEquals(0,backend.backend.starts.get())
+    }
+
 }

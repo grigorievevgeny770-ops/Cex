@@ -52,3 +52,6 @@
 |No inventory/receipt/loss/execution creation by close|real owned DB before/after each close|passed for all five cases|
 
 All real write cases use a separately archived backend and a newly owned SQLite fixture, never the shared user database. Timeout and permission faults are synthetic; they are not claimed as live-backend failure injection.
+
+## Receive final entry
+125 JVM + 7 connected tests: 0 failures/errors/skips. New final navigation initializes only the form, read refresh/rotation never POST; partial4 → empty final lines[]/reason/transfer version3 preserves received4 and shortage6. Explicit final receipt by second worker via the new button passed actual backend fixture (4+5final, shortage1): /tmp/tseh-final-receive-real-run1/result.json.

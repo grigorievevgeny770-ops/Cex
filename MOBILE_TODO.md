@@ -18,3 +18,6 @@
 - [x] Domain/DTO/UseCase/Repository/RemoteDataSource, capability gate и durable close command.
 - [x] Диалог причины и серверные active/history/all списки; закрытый остаток не считается выполненным.
 - [x] Независимая Compose/real fixture приёмка закрытия и baseline; APK установлен, этап готов к локальному commit.
+
+## Дополнение: завершение приёмки
+- [x] Отдельный вход в final-форму из карточки, zero-final и явное подтверждение, regression/Compose/real-backend проверка, APK и локальный commit.

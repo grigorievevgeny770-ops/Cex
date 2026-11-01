@@ -37,7 +37,7 @@ class ReceiveExecutionViewModel @Inject constructor(savedStateHandle: SavedState
     private val execute: ExecuteReceiveUseCase, pending: PendingCommandRepository,
 ) : ViewModel() {
     private val taskId: Long = checkNotNull(savedStateHandle["taskId"])
-    private val mutableState = MutableStateFlow(ReceiveExecutionUiState())
+    private val mutableState = MutableStateFlow(ReceiveExecutionUiState(final = savedStateHandle.get<Boolean>("final") ?: false))
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
     init {
@@ -95,7 +95,7 @@ class ReceiveExecutionViewModel @Inject constructor(savedStateHandle: SavedState
                 is Outcome.Success -> if (request == generation) mutableState.update { state ->
                     state.copy(loading = false, stale = false, task = task.value,
                         inputs = task.value.lines.map { line -> if (resetInputs) ActualLineInput(line.id) else state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id) },
-                        final = if (resetInputs) false else state.final, reason = if (resetInputs) "" else state.reason, comment = if (resetInputs) "" else state.comment)
+                        final = if (resetInputs && state.result is ExecutionResultState.Confirmed) false else state.final, reason = if (resetInputs) "" else state.reason, comment = if (resetInputs) "" else state.comment)
                 }
             }
         }
