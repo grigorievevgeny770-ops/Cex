@@ -13,3 +13,10 @@
 - Независимый `./scripts/verify.sh`: BUILD SUCCESSFUL; test задачи NO-SOURCE на этом этапе, lint без errors, assembleDebug создал APK. Лог /tmp/workshop-stage1-final.log.
 - Найденный lint defect includeSubdomains исправлен исполнителем до commit; без suppress. Предупреждения о newer dependencies/SDK остаются информационными.
 - Исходный экран scaffold не считается завершённым workflow; следующие этапы обязательны.
+- Дополнительно после commit: adb install -r debug APK Success, am start -W MainActivity Status ok/COLD (API37 emulator sdk_gphone16k_arm64). Это launch smoke основы, не scenario30.
+
+## Этап 2 — 2026-11-01
+- Auth/session domain usecases, Retrofit DTO datasource, DataStore environment, encrypted AES-GCM/Keystore cookie storage, generation guarded CookieJar, MVI Login/Restore/Logout и app DI.
+- Review обнаружил late logout/restore state races и non-atomic session context; исправлено до acceptance, regression tests добавлены.
+- Независимый ./scripts/verify.sh: BUILD SUCCESSFUL (/tmp/workshop-stage2-review.log). 18 JVM tests: domain3/data14/feature-auth1, failures0/errors0. Exact decimal strings/Long, cookie restart/update/matching/expiry, legacy/native errors, HTML404, late session races проверены synthetic MockWebServer.
+- Actual Android Keystore instrumentation пока не запускался; включён в финальные проверки. Нет write-проверок действующего backend.

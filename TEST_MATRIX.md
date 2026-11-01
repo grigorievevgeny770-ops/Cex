@@ -4,7 +4,7 @@
 
 | № | Сценарий | Уровень | Статус |
 |---|---|---|---|
-|1|Auth success/error, restart/update cookies, logout late response|data + instrumentation|Не запускался|
+|1|Auth success/error, restart/update cookies, logout late response|data + instrumentation|JVM tests passed; Keystore instrumentation pending|
 |2|No password persistence/logged cookies, actor/server isolation|data + review|Не запускался|
 |3|Workshop42 после main7, missing/inactive/403|domain/data|Не запускался|
 |4|Task scope/paging/filter race/unknown enums|data/VM|Не запускался|
@@ -22,7 +22,7 @@
 |16|Manual override forbidden/no v1 fallback|data/VM|Не запускался|
 |17|Sheet batch/unknown reserve/missing/preview errors|data/VM|Не запускался|
 |18|Manufacture500 pending/no optimistic stock|data/VM|Не запускался|
-|19|BigDecimal string/Long/formatter separation|unit|Не запускался|
+|19|BigDecimal string/Long/formatter separation|unit|Transport string/Long passed; formatter pending|
 |20|Strict per-command fields|serialization|Не запускался|
 |21|Stock/search/pages/negative/unknown/catalog separation|data/VM|Не запускался|
 |22|Persist before network/Room failure prevents send|Room/dispatcher|Не запускался|

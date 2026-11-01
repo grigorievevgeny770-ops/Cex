@@ -3,7 +3,7 @@
 
 - [x] 0. Аудит среды и read-only capability API
 - [x] 1. Модули, Compose, DI, навигация, собираемый debug
-- [ ] 2. DTO, HTTP, точные числа, защищённая cookie-сессия, Login/Restore/Logout
+- [x] 2. DTO, HTTP, точные числа, защищённая cookie-сессия, Login/Restore/Logout
 - [ ] 3. Room PendingCommand, dispatcher, exact retry/recovery до write UI
 - [ ] 4. Workshop resolver, task list/detail/start/full history
 - [ ] 5. Receive partial/final/shortage/sheets/recovery

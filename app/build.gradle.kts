@@ -20,7 +20,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 }
 
 kotlin { compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17 } }
@@ -43,6 +43,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.serialization.json)
+    implementation(libs.okhttp)
     implementation(libs.androidx.navigation.compose)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.test)

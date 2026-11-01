@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -19,6 +20,12 @@ android {
 kotlin { compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17 } }
 
 dependencies {
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.serialization)
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
+    implementation(libs.datastore.preferences)
+    testImplementation(libs.mockwebserver)
     implementation(project(":domain"))
     implementation(libs.coroutines.core)
     testImplementation(libs.junit)
