@@ -18,7 +18,7 @@ import com.logunovinc.workshopmanager.feature.tasks.*
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.logunovinc.workshopmanager.feature.stock.StockScreen
+import com.logunovinc.workshopmanager.feature.stock.*
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -62,7 +62,8 @@ private fun WorkshopNavigation(login: String, onLogout: () -> Unit) {
                 })
             }
             composable("recovery") { entry -> RecoveryRoute(hiltViewModel(entry)) { navController.navigate("task/$it") } }
-            composable("stock") { StockScreen() }
+            composable("stock") { entry -> StockListRoute(hiltViewModel(entry)) { navController.navigate("stock-item/$it") } }
+            composable("stock-item/{productId}", arguments = listOf(navArgument("productId") { type = NavType.LongType })) { entry -> StockDetailRoute(hiltViewModel(entry)) }
         }
     }
 }

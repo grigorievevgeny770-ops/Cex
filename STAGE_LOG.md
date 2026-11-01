@@ -39,3 +39,7 @@
 ## Этап 6 — 2026-11-01
 - Dispatch form/review/confirmation через common durable dispatcher, отдельный strict DTO, общий frozen physical-line validator, явное объяснение in-transit без main credit.
 - Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage6-review.log),72 tests0fail, lint/assembleDebug/architecture. Проверены partial3→7, sheets-only,409reserve/422insufficient, exact500retry и doubletap/recovery VM. Живые stock mutations не выполнялись.
+
+## Этап 7 — 2026-11-01
+- Stock list/detail/server search/pagination/onlyAvailable, dimensions nullable availability, unallocated reserves, shared formatter и read refresh при entry/resume. Catalog/stock-definition отдельные read модели для prototype.
+- Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage7-review.log):82 tests0fail, lint/assembleDebug/architecture. Новые проверки: querypage2,zero/negative,unknownfreeSheets,Long,currentgeometryunits/catalognotstock,403/missingroute и VMfilterrace/debounce55positions/detailrefreshservertruth.

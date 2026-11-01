@@ -24,7 +24,7 @@
 |18|Manufacture500 pending/no optimistic stock|data/VM|Не запускался|
 |19|BigDecimal string/Long/formatter separation|unit|Transport string/Long passed; formatter pending|
 |20|Strict per-command fields|serialization|Не запускался|
-|21|Stock/search/pages/negative/unknown/catalog separation|data/VM|Не запускался|
+|21|Stock/search/pages/negative/unknown/catalog separation|data/VM|Unit/MockWebServer/VM passed; connected pending|
 |22|Persist before network/Room failure prevents send|Room/dispatcher|Room/Robolectric/MockWebServer passed; physical process kill pending|
 |23|Concurrent VM events one pending command|Room/dispatcher|Room/Robolectric/MockWebServer passed; physical process kill pending|
 |24|Accepted response lost/restart/raw same token and body|Room/MockWebServer|Room/Robolectric/MockWebServer passed; physical process kill pending|
