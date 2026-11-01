@@ -9,6 +9,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,8 +25,10 @@ fun DispatchExecutionRoute(viewModel: DispatchExecutionViewModel, onRecoveryClic
 }
 @Composable
 fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (DispatchExecutionIntent) -> Unit, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit) {
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val task = state.task
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("dispatch-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Text("Отправка · №${task?.id ?: ""}", style = MaterialTheme.typography.headlineMedium)
             Text("Введите фактически отданное количество в этом шаге. Товар будет в пути: получатель ещё не принял его. Основной склад зачислит товар после отдельной приёмки")
@@ -55,7 +60,7 @@ fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (Dispatch
         item {
             Text("Остаток задания не считается потерей")
             OutlinedTextField(value = state.comment, onValueChange = { onIntent(DispatchExecutionIntent.CommentChanged(it)) }, label = { Text("Комментарий") }, enabled = state.editable, modifier = Modifier.fillMaxWidth())
-            Button(onClick = { onIntent(DispatchExecutionIntent.ReviewClick) }, enabled = state.editable, modifier = Modifier.fillMaxWidth()) { Text("Проверить отправку") }
+            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(DispatchExecutionIntent.ReviewClick) }, enabled = state.editable, modifier = Modifier.fillMaxWidth()) { Text("Проверить отправку") }
             TextButton(onClick = { onIntent(DispatchExecutionIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить задание") }
         }
     }

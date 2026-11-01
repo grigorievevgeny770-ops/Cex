@@ -9,6 +9,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,8 +25,10 @@ fun ReceiveExecutionRoute(viewModel: ReceiveExecutionViewModel, onRecoveryClick:
 }
 @Composable
 fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExecutionIntent) -> Unit, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit) {
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val task = state.task
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("receive-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Text("Приёмка · №${task?.id ?: ""}", style = MaterialTheme.typography.headlineMedium)
             Text("Введите только фактически прибывшее в этом шаге количество. Ранее принятые товары повторно не вводите")
@@ -50,14 +55,14 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
                     Text("Листы: принято ${line.actualSheets ?: "—"} · осталось ${line.remainingSheets ?: "—"}")
                     line.sheetLength?.let { Text("Длина по заданию ${QuantityFormatter.format(it)} м") }
                     OutlinedTextField(value = input.sheets, onValueChange = { onIntent(ReceiveExecutionIntent.SheetsChanged(line.id, it)) }, label = { Text("Прибыло листов в этом шаге") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(ReceiveExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Прибыло в этом шаге, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
+                } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(ReceiveExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Прибыло в этом шаге, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("receive-qty-${line.id}"))
             } }
         }
         item {
             Row { Checkbox(checked = state.final, onCheckedChange = { onIntent(ReceiveExecutionIntent.FinalChanged(it)) }, enabled = state.editable); Text(if (state.final) "Завершить приёмку" else "Продолжить ожидание оставшегося") }
             if (state.final) OutlinedTextField(value = state.reason, onValueChange = { onIntent(ReceiveExecutionIntent.ReasonChanged(it)) }, label = { Text("Причина недостачи, если она есть") }, enabled = state.editable, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = state.comment, onValueChange = { onIntent(ReceiveExecutionIntent.CommentChanged(it)) }, label = { Text("Комментарий") }, enabled = state.editable, modifier = Modifier.fillMaxWidth())
-            Button(onClick = { onIntent(ReceiveExecutionIntent.ReviewClick) }, enabled = state.editable, modifier = Modifier.fillMaxWidth()) { Text("Проверить приёмку") }
+            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ReceiveExecutionIntent.ReviewClick) }, modifier = Modifier.fillMaxWidth().testTag("receive-review"), enabled = state.editable) { Text("Проверить приёмку") }
             TextButton(onClick = { onIntent(ReceiveExecutionIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить задание") }
         }
     }
@@ -74,7 +79,7 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
                 else if (!review.final) Text("Оставшийся товар продолжим ожидать. Недостача сейчас не утверждается")
                 if (review.comment.isNotBlank()) Text(review.comment)
             } },
-            confirmButton = { Button(onClick = { onIntent(ReceiveExecutionIntent.ConfirmClick) }, enabled = state.result != ExecutionResultState.Sending && state.pending == null) { Text("Подтвердить") } },
+            confirmButton = { Button(onClick = { onIntent(ReceiveExecutionIntent.ConfirmClick) }, modifier = Modifier.testTag("receive-confirm"), enabled = state.result != ExecutionResultState.Sending && state.pending == null) { Text("Подтвердить") } },
             dismissButton = { TextButton(onClick = { onIntent(ReceiveExecutionIntent.DismissReview) }, enabled = state.result != ExecutionResultState.Sending) { Text("Изменить") } })
     }
 }

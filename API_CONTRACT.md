@@ -31,3 +31,6 @@ Legacy missing descriptor/schema1 — неподдерживаемый productio
 ## Повторная capability проверка во время этапа 8
 Локальный сервер обновлён независимо от Android-разработки: OpenAPI HTTP200, 116 paths, присутствуют все три v2 production POST; snapshot /tmp/workshop-openapi-v2.json. Контракт Preview/Descriptor/ByRecipe/Prototype теперь подтверждается локальной схемой и source /Users/chulkova/PetProjects/sklad/code/app/workshop/production_router.py. Наличие routes не означает пройденные live write-сценарии. Android агент не перезапускал и не изменял backend/БД.
 Серверное ТЗ обнаружено: /Users/chulkova/PetProjects/sklad/WORKSHOP_PRODUCTION_NORMS_SPEC.md. Роль frozen output подтверждена production_planning.py/production_create.py как output. Удалённое окружение требует отдельного повторного аудита перед передачей.
+
+## Финальный read-only аудит
+Локальный OpenAPI:116 paths, tasks присутствует,3v2 production POST. Удалённый OpenAPI:68 paths, tasks отсутствует, v2 отсутствует.22synthetic fixtures прошли jsonschema4.26.0 Draft202012Validator по свежему снимку /tmp/workshop-openapi-v2.json; Python3.12 isolatedvenv. Живые авторизованные write-проверки настоящего backend не запускались.

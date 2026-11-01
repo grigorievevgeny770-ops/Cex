@@ -9,6 +9,9 @@ plugins {
 
 val releaseBaseUrl = providers.gradleProperty("releaseBaseUrl").orElse("https://example.invalid/").get()
 require(URI(releaseBaseUrl).scheme == "https") { "releaseBaseUrl must use HTTPS" }
+val fixtureBaseUrl = providers.gradleProperty("fixtureBaseUrl").orElse("http://127.0.0.1:9/").get()
+require(URI(fixtureBaseUrl).scheme == "http" && URI(fixtureBaseUrl).host in setOf("10.0.2.2", "127.0.0.1", "localhost")) { "fixtureBaseUrl must be a local debug HTTP address" }
+val fixtureBaseUrlLiteral = "\"" + fixtureBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 val releaseBaseUrlLiteral = "\"" + releaseBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
@@ -20,11 +23,22 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.logunovinc.workshopmanager.testing.WorkshopTestRunner"
     }
+    sourceSets.getByName("androidTest").assets.srcDir("../data/src/test/resources")
     buildTypes {
         debug { buildConfigField("String", "DEFAULT_BASE_URL", "\"http://10.0.2.2:8000/\"") }
         release { buildConfigField("String", "DEFAULT_BASE_URL", releaseBaseUrlLiteral) }
+        create("processFixture") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".processfixture"
+            matchingFallbacks += listOf("debug")
+            buildConfigField("String", "DEFAULT_BASE_URL", fixtureBaseUrlLiteral)
+        }
+    }
+    sourceSets.getByName("processFixture") {
+        manifest.srcFile("src/debug/AndroidManifest.xml")
+        res.srcDir("src/debug/res")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -36,6 +50,15 @@ android {
 kotlin { compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17 } }
 
 dependencies {
+    androidTestImplementation(libs.hilt.testing)
+    kspAndroidTest(libs.hilt.compiler)
+    androidTestImplementation(libs.mockwebserver)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.espresso)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.room.runtime)
+    androidTestImplementation(libs.room.ktx)
     implementation(project(":domain"))
     implementation(project(":data"))
     implementation(project(":core:ui"))

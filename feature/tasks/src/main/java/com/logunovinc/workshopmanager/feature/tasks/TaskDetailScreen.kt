@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -30,7 +31,7 @@ fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Un
 @Composable
 fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
     val task = state.task
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("task-detail-list").padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(task?.let { "Задание №${it.id}" } ?: "Задание", style = MaterialTheme.typography.headlineSmall)
@@ -63,10 +64,12 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 if (task.status == TaskStatus.COMPLETED && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
                 if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported != true) Text("Производственный режим требует серверной нормы v2. Старое ручное списание не поддерживается; обратитесь к менеджеру")
                 if (task.type == TaskType.UNKNOWN || task.status == TaskStatus.UNKNOWN) Text("Неподдерживаемый тип или статус сервера. Изменения недоступны")
-                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported == true) task.production?.let { RecipeSummary(it) }
-                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Изготовить изделие") }
+                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported == true) task.production?.let {
+                    if (it.status == com.logunovinc.workshopmanager.domain.production.RecipeStatus.AWAITING_PROTOTYPE) Text("Требуется первый прототип; норма ещё не задана") else RecipeSummary(it)
+                }
+                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, modifier = Modifier.testTag("task-manufacturing"), enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Изготовить изделие") }
                 if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Отправить товары") }
-                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Принять товары") }
+                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, modifier = Modifier.testTag("task-receive"), enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Принять товары") }
                 if (task.canStart) Button(onClick = { onIntent(TaskDetailIntent.StartClick) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Взять в работу") }
             }
             items(task.lines, key = { "line-${it.id}" }) { line -> TaskLineCard(line) }
