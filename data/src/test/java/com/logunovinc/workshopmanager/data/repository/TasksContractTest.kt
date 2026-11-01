@@ -55,26 +55,38 @@ class TasksContractTest {
         assertEquals(42L, (ResolveWorkshopUseCase(warehouses)() as Outcome.Success).value.id)
         assertEquals("true", server.takeRequest().requestUrl?.queryParameter("include_inactive"))
     }
-    @Test fun scopeFiltersAndPaginationAreServerQueries() = runBlocking {
-        server.enqueue(reply("""{"items":[${task()},${task(id = 102)}],"total":61,"limit":50,"offset":0}"""))
-        val page = repository.tasks(42, TaskFilter(), 50, 0) as Outcome.Success
-        assertTrue(page.value.hasMore)
-        assertEquals(listOf(101L, 102L), page.value.items.map(Task::id))
-        val default = server.takeRequest().requestUrl!!
-        assertEquals("42", default.queryParameter("warehouse_id"))
-        assertNull(default.queryParameter("assignee_user_id"))
-        assertEquals("true", default.queryParameter("active_only"))
-        for (type in listOf(TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS, TaskType.MANUFACTURE_PRODUCT)) {
-            server.enqueue(reply("""{"items":[],"total":61,"limit":50,"offset":50}"""))
-            repository.tasks(42, TaskFilter(type = type), 50, 50)
-            val filtered = server.takeRequest().requestUrl!!
-            assertNull(filtered.queryParameter("assignee_user_id"))
-            assertNull(filtered.queryParameter("status"))
-            assertEquals("active", filtered.queryParameter("view"))
-            assertEquals("42", filtered.queryParameter("warehouse_id"))
-            assertEquals(type.name, filtered.queryParameter("type"))
-            assertEquals("true", filtered.queryParameter("active_only"))
-            assertEquals("50", filtered.queryParameter("offset"))
+    @Test fun strictTaskQueryRejectsLegacyActiveOnlyButAcceptsCurrentTypeAndPages() = runBlocking {
+        val allowedKeys = setOf("view", "warehouse_id", "type", "limit", "offset")
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val query = request.requestUrl!!
+                if (query.encodedPath != "/api/workshop/tasks") return reply("{}", 404)
+                if ((query.queryParameterNames - allowedKeys).isNotEmpty()) return reply(
+                    """{"code":"VALIDATION_ERROR","message":"Request validation failed","details":{"errors":[{"loc":["query","active_only"],"message":"Extra inputs are not permitted","type":"extra_forbidden"}]}}""", 422)
+                val offset = query.queryParameter("offset")!!.toLong()
+                val type = query.queryParameter("type") ?: "RECEIVE_GOODS"
+                val items = if (offset == 0L) "${task(type = type)},${task(id = 102, type = type)}" else task(id = 103, type = type)
+                return reply("""{"items":[$items],"total":61,"limit":50,"offset":$offset}""")
+            }
+        }
+        val legacy = okhttp3.Request.Builder().url(server.url("/api/workshop/tasks?warehouse_id=42&view=active&active_only=true&limit=50&offset=0")).build()
+        okhttp3.OkHttpClient().newCall(legacy).execute().use { response ->
+            assertEquals(422, response.code)
+            assertTrue(response.body!!.string().contains("Request validation failed"))
+        }
+        server.takeRequest()
+        for (type in listOf(null, TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS, TaskType.MANUFACTURE_PRODUCT)) {
+            for (offset in listOf(0L, 50L)) {
+                val page = repository.tasks(42, TaskFilter(type = type), 50, offset) as Outcome.Success
+                if (offset == 0L) assertEquals(listOf(101L, 102L), page.value.items.map(Task::id))
+                val query = server.takeRequest().requestUrl!!
+                assertEquals(if (type == null) allowedKeys - "type" else allowedKeys, query.queryParameterNames)
+                assertEquals("active", query.queryParameter("view"))
+                assertEquals("42", query.queryParameter("warehouse_id"))
+                assertEquals(type?.name, query.queryParameter("type"))
+                assertEquals("50", query.queryParameter("limit"))
+                assertEquals(offset.toString(), query.queryParameter("offset"))
+            }
         }
     }
     @Test fun unsupportedEnumsAndNullDatesDoNotGuessMutations() = runBlocking {

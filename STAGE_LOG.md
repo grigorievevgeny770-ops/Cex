@@ -89,3 +89,10 @@ Read-only audit: локальный OpenAPI теперь116paths/3productionv2PO
 - Removed reserve displays from warehouse list/detail totals, dimensions/sheet reserves and unallocated reserve fragment. Physical/free values and unknown availability preserved. DTO/domain/server reserve accounting and production previews unchanged.
 - Independent ./scripts/verify.sh SUCCESSFUL110tests/lint/assembleDebug/architecture, /tmp/workshop-hide-stock-reserves-review.log. No mirrored label tests added; connected test sources unchanged. No backend writes.
 - Normal debug APK installed/launched Statusok;14945409bytes SHA2563a48363c40915f75c5422a61a18626b3964d8da58fffa20ca192838eced86167.
+
+## 2026-11-02 — fix refresh Request validation failed
+- Root cause: the legacy active_only=true parameter remained in task GET for speculative compatibility. Updated backend uses a strict query model and returns422 VALIDATION_ERROR, details.errors loc=query.active_only/type=extra_forbidden. Removed it; canonical request uses view=active plus supported type/warehouse_id/limit/offset only.
+- Read-only diagnostic with a separate authenticated worker session reproduced old query422 and corrected query200 (Page.items). Diagnostic login/logout200; no inventory/task mutations, password/cookie not logged.
+- Strict MockWebServer regression reproduces422 and asserts exact allowed query keys for all3types/no-type and pages0/50. Independent ./scripts/verify.sh SUCCESSFUL110tests/lint/build: /tmp/workshop-refresh-query-fix-review.log.
+- Current local OpenAPI136paths, TaskRead completion flags present, /start absent.22canonical fixtures independently pass jsonschema against /tmp/workshop-openapi-refresh.json. Prior server-rollout/schema blockers are closed for local API availability; live multi-worker write acceptance remains unperformed.
+- Updated APK installed/launched Statusok. Tasks screen present; validation error absent before/after refresh gesture.14945409bytes SHA256e712603bc2e50ef4f4e0f129a5b195edf5f81349d39181a08acb080e746fdc33.
