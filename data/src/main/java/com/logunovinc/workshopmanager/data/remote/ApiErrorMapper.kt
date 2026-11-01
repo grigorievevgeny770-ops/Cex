@@ -35,7 +35,7 @@ class ApiErrorMapper(private val json: Json) {
             else -> "Сервер не смог обработать запрос"
         }
         val issues = fieldIssues(error?.get("details") ?: error?.get("detail"))
-        return AppError(kind, message ?: issues.joinToString("; ").ifBlank { fallback }, code, response.code(), issues)
+        return AppError(kind, if (kind == ErrorKind.INCOMPATIBLE_SERVER) fallback else message ?: issues.joinToString("; ").ifBlank { fallback }, code, response.code(), issues)
     }
     private fun fieldIssues(value: JsonElement?): List<String> = when (value) {
         is JsonArray -> value.flatMap(::fieldIssues)
@@ -50,7 +50,7 @@ class ApiErrorMapper(private val json: Json) {
     }
     fun throwable(error: Exception): AppError = when (error) {
         is CancellationException -> throw error
-        is SerializationException, is IllegalArgumentException -> AppError(ErrorKind.INCOMPATIBLE_SERVER, "Ответ сервера несовместим с приложением")
+        is SerializationException, is IllegalArgumentException, is java.time.DateTimeException -> AppError(ErrorKind.INCOMPATIBLE_SERVER, "Ответ сервера несовместим с приложением")
         is IOException -> AppError(ErrorKind.NETWORK, "Не удалось связаться с сервером. Проверьте сеть и адрес")
         else -> AppError(ErrorKind.LOCAL_STORAGE, "Не удалось прочитать или сохранить локальные данные")
     }

@@ -6,9 +6,9 @@
 |---|---|---|---|
 |1|Auth success/error, restart/update cookies, logout late response|data + instrumentation|JVM tests passed; Keystore instrumentation pending|
 |2|No password persistence/logged cookies, actor/server isolation|data + review|Не запускался|
-|3|Workshop42 после main7, missing/inactive/403|domain/data|Не запускался|
-|4|Task scope/paging/filter race/unknown enums|data/VM|Не запускался|
-|5|Start, worker race, stale version, permissions|data/VM|Не запускался|
+|3|Workshop42 после main7, missing/inactive/403|domain/data|Unit/MockWebServer/VM passed; Compose pending|
+|4|Task scope/paging/filter race/unknown enums|data/VM|Unit/MockWebServer/VM passed; Compose pending|
+|5|Start, worker race, stale version, permissions|data/VM|Unit/MockWebServer/VM passed; Compose pending|
 |6|Receive full/partial/multiple step delta|domain/data|Не запускался|
 |7|Receive10→4→5 final shortage1 без loss approval|data/VM|Не запускался|
 |8|Zero final/reason, partial, excess/foreign line|domain/data|Не запускался|
@@ -31,8 +31,8 @@
 |25|ACK local failure honest state/safe retry|Room/dispatcher|Room/Robolectric/MockWebServer passed; physical process kill pending|
 |26|401/403 preserves unknown pending/actor|data|Room/Robolectric/MockWebServer passed; physical process kill pending|
 |27|Rotation/recomposition/back no auto write|Compose|Не запускался|
-|28|History over50 paged IDs|data/VM|Не запускался|
-|29|Unsupported environment separate from empty/auth failure|data/VM|Не запускался|
+|28|History over50 paged IDs|data/VM|Unit/MockWebServer/VM passed; Compose pending|
+|29|Unsupported environment separate from empty/auth failure|data/VM|Unit/MockWebServer/VM passed; Compose pending|
 |30|Login→list→detail→confirm→success/history+stock refresh|Compose emulator|Не запускался|
 
 Живые write-проверки: не разрешены на общей базе, нужен отдельный fixture backend. Production v2 живая интеграция: внешний блокер, routes отсутствуют на дату аудита.

@@ -14,7 +14,10 @@ import androidx.navigation.compose.*
 import com.logunovinc.workshopmanager.core.ui.WorkshopTheme
 import com.logunovinc.workshopmanager.feature.auth.AuthRoute
 import com.logunovinc.workshopmanager.feature.auth.AuthViewModel
-import com.logunovinc.workshopmanager.feature.tasks.TasksScreen
+import com.logunovinc.workshopmanager.feature.tasks.*
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.logunovinc.workshopmanager.feature.stock.StockScreen
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -32,7 +35,7 @@ private fun WorkshopNavigation(login: String, onLogout: () -> Unit) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val route = entry?.destination?.route
-    Scaffold(topBar = { Row { Text(login); TextButton(onClick = onLogout) { Text("Выйти") } } }, bottomBar = {
+    Scaffold(topBar = { Row { if (route != "tasks" && route != "stock") TextButton(onClick = { navController.popBackStack() }) { Text("Назад") }; Text(login); TextButton(onClick = onLogout) { Text("Выйти") } } }, bottomBar = {
         if (route != "login") NavigationBar {
             listOf("tasks" to "Задания", "stock" to "Склад цеха").forEach { (destination, title) ->
                 NavigationBarItem(selected = route == destination, onClick = {
@@ -42,7 +45,11 @@ private fun WorkshopNavigation(login: String, onLogout: () -> Unit) {
         }
     }) { padding ->
         NavHost(navController, startDestination = "tasks", modifier = Modifier.padding(padding)) {
-            composable("tasks") { TasksScreen() }
+            composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, { navController.navigate("recovery") }) }
+            composable("task/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
+                TaskDetailRoute(hiltViewModel(entry)) { navController.navigate("recovery") }
+            }
+            composable("recovery") { entry -> RecoveryRoute(hiltViewModel(entry)) { navController.navigate("task/$it") } }
             composable("stock") { StockScreen() }
         }
     }

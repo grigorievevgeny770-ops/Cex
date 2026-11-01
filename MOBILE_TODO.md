@@ -5,7 +5,7 @@
 - [x] 1. Модули, Compose, DI, навигация, собираемый debug
 - [x] 2. DTO, HTTP, точные числа, защищённая cookie-сессия, Login/Restore/Logout
 - [x] 3. Room PendingCommand, dispatcher, exact retry/recovery до write UI
-- [ ] 4. Workshop resolver, task list/detail/start/full history
+- [x] 4. Workshop resolver, task list/detail/start/full history
 - [ ] 5. Receive partial/final/shortage/sheets/recovery
 - [ ] 6. Dispatch partial/confirmation/exact retry
 - [ ] 7. Stock search/pagination/detail/dimensions

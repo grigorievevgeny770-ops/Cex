@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.test)
     debugImplementation(libs.compose.test.manifest)
