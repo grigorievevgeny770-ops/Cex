@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 954 598 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 952 739 байт.
 
-SHA256: `c6b7664eb2572b534d23e938ce0bb2eed105b831bb54c27cc1099e1d28aeae0c`.
+SHA256: `0286514b7a7cb10dc9347ddf6501b961bfd721bfc66a6473576cc6f0c9a24aa0`.
 
 APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
 
@@ -56,3 +56,5 @@ Connected tests запускать на выделенном эмуляторе:
 Push, публикация APK и server deployment не выполнялись.
 
 Debug-prefill enabled by the user for local port8000 only. Values come from ignored local.properties and are included in ordinary debug APK only; no auto-login. Release/processFixture defaults stay empty. Prefill regression tests and test-APK compilation passed; emulator fields verified without submitting login.
+
+Task assignee filters removed at user request. Requests always omit assignee_user_id; the server determines the available workshop scope. Type/status filters and server pagination remain. Independent verify passed105tests/lint/build; updated APK installed and launched.

@@ -65,3 +65,8 @@ Read-only audit: локальный OpenAPI теперь116paths/3productionv2PO
 - User requested local default login/password fields. Values added only to ignored local.properties; debug BuildConfig consumes them, release/processFixture empty. No auto-login, remote/other-port fields empty, environment switch clears fields, submitted passwords still clear.
 - Independent ./scripts/verify.sh SUCCESSFUL105tests; :app:assembleDebugAndroidTest SUCCESSFUL. Logs /tmp/workshop-prefill-review.log and /tmp/workshop-prefill-test-apk-review.log. No actual login POST.
 - APK installed/relaunched; UI automation confirms requested login visible and masked password populated. APK14954598bytes SHA256c6b7664eb2572b534d23e938ce0bb2eed105b831bb54c27cc1099e1d28aeae0c.
+
+## Follow-up — all available workshop tasks
+- User removed the own/queue versus assigned-to-me switch. UI chips and TaskFilter.assignedToMe removed; Retrofit request no longer declares assignee_user_id. Server ACL/scope remains authoritative; no local page filtering or permission changes.
+- Contract tests assert no assignee parameter across three task types, both status modes and page2. Filter race test uses type selection. Independent ./scripts/verify.sh SUCCESSFUL105tests/lint/build: /tmp/workshop-all-available-review.log.
+- Updated normal debug APK installed/launched Statusok.14952739bytes SHA2560286514b7a7cb10dc9347ddf6501b961bfd721bfc66a6473576cc6f0c9a24aa0. No backend mutations.

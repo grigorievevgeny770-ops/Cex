@@ -9,7 +9,7 @@ interface WorkshopApi {
     @GET("api/workshop/tasks") suspend fun tasks(
         @Query("warehouse_id") warehouseId: Long, @Query("active_only") active: Boolean,
         @Query("type") type: String?, @Query("status") status: String?,
-        @Query("assignee_user_id") assigneeId: Long?, @Query("limit") limit: Int, @Query("offset") offset: Long,
+        @Query("limit") limit: Int, @Query("offset") offset: Long,
     ): Response<PageDto<TaskDto>>
     @GET("api/workshop/tasks/{id}") suspend fun task(@Path("id") id: Long): Response<TaskDto>
     @GET("api/workshop/tasks/{id}/executions") suspend fun executions(@Path("id") id: Long, @Query("limit") limit: Int, @Query("offset") offset: Long): Response<PageDto<ExecutionDto>>

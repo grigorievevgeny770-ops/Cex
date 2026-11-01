@@ -41,11 +41,6 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
         }
         state.warehouse?.let { Text(it.name, style = MaterialTheme.typography.bodySmall) }
         Row {
-            FilterChip(selected = !state.filter.assignedToMe, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(assignedToMe = false))) }, label = { Text("Свои + очередь") })
-            Spacer(Modifier.width(8.dp))
-            FilterChip(selected = state.filter.assignedToMe, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(assignedToMe = true))) }, label = { Text("Назначенные мне") })
-        }
-        Row {
             FilterChip(selected = !state.filter.completed, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(completed = false))) }, label = { Text("Текущие") })
             Spacer(Modifier.width(8.dp))
             FilterChip(selected = state.filter.completed, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(completed = true))) }, label = { Text("Завершённые") })

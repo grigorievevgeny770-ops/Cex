@@ -23,7 +23,7 @@ class TasksContractTest {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val mapper = TaskMapper()
     private fun reply(body: String, status: Int = 200) = MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json").setBody(body)
-    private fun task(id: Long = 101, type: String = "RECEIVE_GOODS", status: String = "new", version: Long = 3): String = """{"id":$id,"type":"$type","status":"$status","version":$version,"warehouse_id":42,"assignee_user_id":null,"created_by":1,"created_at":"2026-11-01T15:00:00+03:00","due_at":null,"comment":"test","allowed_actions":["start","execute"],"lines":[{"id":1001,"product_id":301,"product_name":"Материал","role":"receive","base_unit":"шт","planned_qty":"10.0000","actual_qty":"0","remaining_qty":"10.0000","planned_sheets":9,"actual_sheets":0,"remaining_sheets":9,"sheet_length_m":"1.234"}]}"""
+    private fun task(id: Long = 101, type: String = "RECEIVE_GOODS", status: String = "new", version: Long = 3, assigneeId: Long? = null): String = """{"id":$id,"type":"$type","status":"$status","version":$version,"warehouse_id":42,"assignee_user_id":${assigneeId?.toString() ?: "null"},"created_by":1,"created_at":"2026-11-01T15:00:00+03:00","due_at":null,"comment":"test","allowed_actions":["start","execute"],"lines":[{"id":1001,"product_id":301,"product_name":"Материал","role":"receive","base_unit":"шт","planned_qty":"10.0000","actual_qty":"0","remaining_qty":"10.0000","planned_sheets":9,"actual_sheets":0,"remaining_sheets":9,"sheet_length_m":"1.234"}]}"""
     class MemoryJournal : CommandJournal {
         val commands = mutableMapOf<String, PendingCommandEntity>()
         override suspend fun prepare(command: PendingCommandEntity): PrepareResult { commands[command.id] = command; return PrepareResult.Created(command) }
@@ -55,21 +55,27 @@ class TasksContractTest {
         assertEquals("true", server.takeRequest().requestUrl?.queryParameter("include_inactive"))
     }
     @Test fun scopeFiltersAndPaginationAreServerQueries() = runBlocking {
-        server.enqueue(reply("""{"items":[${task()}],"total":61,"limit":50,"offset":0}"""))
+        server.enqueue(reply("""{"items":[${task(assigneeId = 42)},${task(id = 102)}],"total":61,"limit":50,"offset":0}"""))
         val page = repository.tasks(42, TaskFilter(), 50, 0) as Outcome.Success
         assertTrue(page.value.hasMore)
+        assertEquals(listOf(42L, null), page.value.items.map(Task::assigneeId))
         val default = server.takeRequest().requestUrl!!
         assertEquals("42", default.queryParameter("warehouse_id"))
         assertNull(default.queryParameter("assignee_user_id"))
         assertEquals("true", default.queryParameter("active_only"))
-        server.enqueue(reply("""{"items":[],"total":61,"limit":50,"offset":50}"""))
-        repository.tasks(42, TaskFilter(TaskType.DISPATCH_GOODS, assignedToMe = true, completed = true), 50, 50)
-        val filtered = server.takeRequest().requestUrl!!
-        assertEquals("42", filtered.queryParameter("assignee_user_id"))
-        assertEquals("DISPATCH_GOODS", filtered.queryParameter("type"))
-        assertEquals("completed", filtered.queryParameter("status"))
-        assertEquals("false", filtered.queryParameter("active_only"))
-        assertEquals("50", filtered.queryParameter("offset"))
+        for (type in listOf(TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS, TaskType.MANUFACTURE_PRODUCT)) {
+            for (completed in listOf(false, true)) {
+                server.enqueue(reply("""{"items":[],"total":61,"limit":50,"offset":50}"""))
+                repository.tasks(42, TaskFilter(type = type, completed = completed), 50, 50)
+                val filtered = server.takeRequest().requestUrl!!
+                assertNull(filtered.queryParameter("assignee_user_id"))
+                assertEquals("42", filtered.queryParameter("warehouse_id"))
+                assertEquals(type.name, filtered.queryParameter("type"))
+                assertEquals(if (completed) "completed" else null, filtered.queryParameter("status"))
+                assertEquals((!completed).toString(), filtered.queryParameter("active_only"))
+                assertEquals("50", filtered.queryParameter("offset"))
+            }
+        }
     }
     @Test fun unsupportedEnumsAndNullDatesDoNotGuessMutations() = runBlocking {
         server.enqueue(reply(task(type = "FUTURE", status = "future_status")))

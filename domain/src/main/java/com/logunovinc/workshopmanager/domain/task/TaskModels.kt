@@ -12,7 +12,7 @@ data class Page<T>(val items: List<T>, val total: Long, val limit: Int, val offs
     val nextOffset: Long get() = offset + items.size
     val hasMore: Boolean get() = items.isNotEmpty() && nextOffset < total
 }
-data class TaskFilter(val type: TaskType? = null, val assignedToMe: Boolean = false, val completed: Boolean = false)
+data class TaskFilter(val type: TaskType? = null, val completed: Boolean = false)
 data class TaskLine(
     val id: Long, val productId: Long, val productName: String, val sku: String?, val role: String,
     val baseUnit: String?, val unitName: String?, val planned: BigDecimal, val actual: BigDecimal, val remaining: BigDecimal,

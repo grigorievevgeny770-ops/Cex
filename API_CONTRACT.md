@@ -34,3 +34,5 @@ Legacy missing descriptor/schema1 — неподдерживаемый productio
 
 ## Финальный read-only аудит
 Локальный OpenAPI:116 paths, tasks присутствует,3v2 production POST. Удалённый OpenAPI:68 paths, tasks отсутствует, v2 отсутствует.22synthetic fixtures прошли jsonschema4.26.0 Draft202012Validator по свежему снимку /tmp/workshop-openapi-v2.json; Python3.12 isolatedvenv. Живые авторизованные write-проверки настоящего backend не запускались.
+
+The mobile client no longer sends assignee_user_id (user-requested scope simplification). The backend parameter may remain supported for other clients; this app always uses the full permitted workshop scope.

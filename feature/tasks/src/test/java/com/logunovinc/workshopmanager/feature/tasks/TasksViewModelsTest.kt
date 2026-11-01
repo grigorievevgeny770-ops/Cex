@@ -43,18 +43,18 @@ class TasksViewModelsTest {
         val tasks = Tasks()
         val gate = CompletableDeferred<Unit>()
         tasks.listing = { filter, _ ->
-            if (!filter.assignedToMe) withContext(NonCancellable) { gate.await(); Outcome.Success(Page(listOf(sampleTask(1)), 1, 50, 0)) }
-            else Outcome.Success(Page(listOf(sampleTask(2)), 1, 50, 0))
+            if (filter.type == null) withContext(NonCancellable) { gate.await(); Outcome.Success(Page(listOf(sampleTask(1)), 1, 50, 0)) }
+            else Outcome.Success(Page(listOf(sampleTask(2, type = TaskType.DISPATCH_GOODS)), 1, 50, 0))
         }
         val vm = TaskListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadTasksUseCase(tasks))
         runCurrent()
-        vm.onIntent(TaskListIntent.FilterChanged(TaskFilter(assignedToMe = true)))
+        vm.onIntent(TaskListIntent.FilterChanged(TaskFilter(type = TaskType.DISPATCH_GOODS)))
         runCurrent()
         assertEquals(listOf(2L), vm.uiState.value.items.map(Task::id))
         gate.complete(Unit)
         runCurrent()
         assertEquals(listOf(2L), vm.uiState.value.items.map(Task::id))
-        assertTrue(vm.uiState.value.filter.assignedToMe)
+        assertEquals(TaskType.DISPATCH_GOODS, vm.uiState.value.filter.type)
     }
     @Test fun serverPaginationLoadsBeyondFiftyAndDoubleTapDoesNotDuplicatePage() = runTest(dispatcher) {
         val tasks = Tasks()
