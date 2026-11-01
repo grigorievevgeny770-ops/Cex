@@ -16,6 +16,20 @@ class RealTaskRepository(private val remote: WorkshopRemoteDataSource, private v
     }
     override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long) = map(remote.tasks(warehouseId, filter, limit, offset)) { mapper.page(it, mapper::task) }
     override suspend fun task(id: Long) = map(remote.task(id), mapper::task)
+    override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome {
+        if (task.type != TaskType.DISPATCH_GOODS || !task.canExecute)
+            return CommandOutcome.Rejected(null, AppError(ErrorKind.FORBIDDEN, "Отправка недоступна; обновите задание"))
+        val byId = task.lines.associateBy(TaskLine::id)
+        val summaryLines = command.lines.map { actual ->
+            val line = byId[actual.taskLineId]
+            "${line?.productName ?: "Строка"} · строка №${actual.taskLineId}: " + (actual.sheets?.let { "$it листов" } ?: "${actual.quantity?.toPlainString()} ${line?.baseUnit.orEmpty()}")
+        }
+        val summary = CommandSummary("Отправка · задание №${task.id}", summaryLines + listOf("Версия задания ${task.version}", "В пути, получатель ещё не принял"), command.comment)
+        return dispatcher.submit(task.id, "DISPATCH_GOODS", "POST", "api/workshop/tasks/${task.id}/executions", summary) { token ->
+            json.encodeToString(DispatchRequestDto(expectedVersion = task.version, clientToken = token, comment = command.comment,
+                lines = command.lines.map { DispatchLineDto(it.taskLineId, it.quantity, it.sheets) })).toByteArray(Charsets.UTF_8)
+        }
+    }
     override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome {
         if (task.type != TaskType.RECEIVE_GOODS || !task.canExecute || task.transferVersion == null)
             return CommandOutcome.Rejected(null, AppError(ErrorKind.FORBIDDEN, "Приёмка недоступна; обновите задание"))

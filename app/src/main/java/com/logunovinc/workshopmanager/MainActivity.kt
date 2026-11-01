@@ -47,11 +47,17 @@ private fun WorkshopNavigation(login: String, onLogout: () -> Unit) {
         NavHost(navController, startDestination = "tasks", modifier = Modifier.padding(padding)) {
             composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, { navController.navigate("recovery") }) }
             composable("task/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }) { navController.navigate("recovery") }
+                TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }) { navController.navigate("recovery") }
             }
             composable("receive/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
                 val taskId = entry.arguments?.getLong("taskId") ?: return@composable
                 ReceiveExecutionRoute(hiltViewModel(entry), { navController.navigate("recovery") }, {
+                    navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
+                })
+            }
+            composable("dispatch/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
+                val taskId = entry.arguments?.getLong("taskId") ?: return@composable
+                DispatchExecutionRoute(hiltViewModel(entry), { navController.navigate("recovery") }, {
                     navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
                 })
             }

@@ -23,6 +23,7 @@ class ReceiveExecutionViewModelTest {
         var command: ReceiveCommand? = null
         var current = sampleTask().copy(lines = listOf(TaskLine(1001, 301, "Материал", null, "receive", "шт", null, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TEN, null, null, null, null, null, null, null)))
         var receiveResult: suspend () -> CommandOutcome = { CommandOutcome.Confirmed(CommandConfirmation("command", 101, 4, 5001, false)) }
+        override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome = error("dispatch not used")
         override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome { count++; this.command = command; return receiveResult() }
         override suspend fun task(id: Long): Outcome<Task> { reads++; return Outcome.Success(current) }
         override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long): Outcome<Page<Task>> = error("unused")

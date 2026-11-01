@@ -13,7 +13,7 @@
 |7|Receive10→4→5 final shortage1 без loss approval|data/VM|Unit/MockWebServer/VM passed; connected pending|
 |8|Zero final/reason, partial, excess/foreign line|domain/data|Unit/MockWebServer/VM passed; connected pending|
 |9|Frozen sheets/current catalog/baseqty0|data|Unit/MockWebServer/VM passed; connected pending|
-|10|Dispatch partial/remaining/retry/no main credit|data/VM|Не запускался|
+|10|Dispatch partial/remaining/retry/no main credit|data/VM|Unit/MockWebServer/VM passed; connected pending|
 |11|Fixed recipe preview20/10→3/6, no materials in command|MockWebServer|Не запускался|
 |12|Cumulative rounding partial/final — server fixtures only|MockWebServer|Не запускался|
 |13|Prototype q1>1, preview/progress atomic ACK|MockWebServer/VM|Не запускался|

@@ -16,6 +16,8 @@ object TasksModule {
     @Provides @Singleton fun mapper() = TaskMapper()
     @Provides @Singleton fun warehouses(remote: WorkshopRemoteDataSource): WarehouseRepository = RealWarehouseRepository(remote)
     @Provides @Singleton fun tasks(remote: WorkshopRemoteDataSource, mapper: TaskMapper, dispatcher: CommandDispatcher, json: Json, errors: ApiErrorMapper): TaskRepository = RealTaskRepository(remote, mapper, dispatcher, json, errors)
+    @Provides fun prepareDispatch() = PrepareDispatchUseCase()
+    @Provides fun dispatch(repository: TaskRepository) = ExecuteDispatchUseCase(repository)
     @Provides fun prepareReceive() = PrepareReceiveUseCase()
     @Provides fun receive(repository: TaskRepository) = ExecuteReceiveUseCase(repository)
     @Provides fun resolve(repository: WarehouseRepository) = ResolveWorkshopUseCase(repository)

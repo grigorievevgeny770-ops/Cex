@@ -35,3 +35,7 @@
 - Receive delta input/review/confirm через journal: partial/final shortage/zero final/reason, frozen sheets и exact comma decimals; no loss approval/no optimistic stock.
 - Detail refresh при RESUMED и journal observer безопасно снимают блокировку только matching ACK. Input/review не отправляют writes, submit flight guard.
 - Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage5-review.log):63 tests0fail, lint/assembleDebug. Новые domain5/data3/VM3 проверяют10→4→5finalshortage1,zeroFinal,sheets-onlyqty0,foreign/overremaining/overprecision,unknown exactretry, recreated VM pending→ACK→fresh detail. Live backend writes не выполнялись.
+
+## Этап 6 — 2026-11-01
+- Dispatch form/review/confirmation через common durable dispatcher, отдельный strict DTO, общий frozen physical-line validator, явное объяснение in-transit без main credit.
+- Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage6-review.log),72 tests0fail, lint/assembleDebug/architecture. Проверены partial3→7, sheets-only,409reserve/422insufficient, exact500retry и doubletap/recovery VM. Живые stock mutations не выполнялись.
