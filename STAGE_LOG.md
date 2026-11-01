@@ -20,3 +20,8 @@
 - Review обнаружил late logout/restore state races и non-atomic session context; исправлено до acceptance, regression tests добавлены.
 - Независимый ./scripts/verify.sh: BUILD SUCCESSFUL (/tmp/workshop-stage2-review.log). 18 JVM tests: domain3/data14/feature-auth1, failures0/errors0. Exact decimal strings/Long, cookie restart/update/matching/expiry, legacy/native errors, HTML404, late session races проверены synthetic MockWebServer.
 - Actual Android Keystore instrumentation пока не запускался; включён в финальные проверки. Нет write-проверок действующего backend.
+
+## Этап 3 — 2026-11-01
+- Room-журнал exact bytes/token, transactional active slots, singleton per-task locks, ACK snapshot+release transaction, profile isolation, explicit retry без auto replay.
+- Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage3-review.log): 30 tests, zero failures/errors, lint и assembleDebug. Реальные Room SQLite Robolectric проверки: persist-before-network, DB failure no send, concurrent dispatchers, lost reply→disk DB reopen→same bytes/token, ACK-save failure, cancellation, 401/403 после unknown. Это simulation reopen, не реальный kill Android process.
+- Отдельно исправлен default окружения по замечанию пользователя: commit68ec8c5. Debug local10.0.2.2, release HTTPS configurable; remote не используется по умолчанию. APK installed/relaunched; UI hierarchy показывает local URL. Backend health200, protected reads401, real login/write не выполнялись.

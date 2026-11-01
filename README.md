@@ -34,7 +34,11 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Окружения
 
+Debug по умолчанию подключается к локальному backend через Android Emulator:
+`http://10.0.2.2:8000/`. Сохранённый выбор окружения имеет приоритет.
 Адрес выбирается в приложении; логины и пароли не включены в исходники.
+Release URL задаётся `-PreleaseBaseUrl=https://your-test-host/`; без настройки
+используется намеренно нерабочий `https://example.invalid/`. Release требует HTTPS.
 Для Android Emulator локальный backend: `http://10.0.2.2:8000/`.
 Для телефона по USB: `adb reverse tcp:8000 tcp:8000`, затем
 `http://127.0.0.1:8000/`. Не нужно открывать backend в LAN.
@@ -54,3 +58,23 @@ Features зависят только от domain/core:ui, domain не завис
 [Compose BOM](https://developer.android.com/develop/ui/compose/bom),
 [Hilt](https://dagger.dev/hilt/gradle-setup),
 [KSP](https://github.com/google/ksp/releases).
+
+## Сессия и безопасный повтор
+
+Cookie сохраняются в AES-GCM файле в `noBackupFilesDir`, ключ находится в
+Android Keystore. Пароль не сохраняется. При logout/смене сервера старые
+ответы не могут восстановить сессию. Сохранённая сессия проверяется через
+`auth/me`, ID пользователя берётся только из его ответа.
+
+Room-журнал `pending-commands.db` содержит точные UTF-8 тела подтверждённых
+пользователем команд до первого HTTP-запроса. Он изолирован по каноническому
+серверу + числовому ID работника и сохраняется после logout/401.
+После timeout/500/остановки процесса запрос повторяется только явно, с тем
+же token и неизменённым телом. Автоматического фонового replay нет.
+Подтверждение сервера и полный снимок task сохраняются атомарно до
+освобождения слота задания. Неопределённый исход с последующим отказом прав
+требует сверки; такая команда не выдаётся за обычный черновик.
+
+Реальные Room-транзакции, конкуренция двух dispatcher и reopen дисковой БД
+проверяются Robolectric (`:data:testDebugUnitTest`). HTTP contract tests
+используют только MockWebServer, без записей в пользовательский backend.

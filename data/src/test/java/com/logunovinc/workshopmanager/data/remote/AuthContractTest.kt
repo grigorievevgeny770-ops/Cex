@@ -49,6 +49,15 @@ class AuthContractTest {
         assertFalse(storage.value.orEmpty().contains("not-persisted"))
         assertEquals(result.value, repository.session.value.actor)
     }
+    @Test fun logoutUsesCookiePathForItsActualEndpoint() = runBlocking {
+        server.enqueue(reply("""{"login":"worker","role":"worker"}""").addHeader("Set-Cookie", "session=path-cookie; Path=/auth; HttpOnly"))
+        server.enqueue(reply("""{"id":42,"login":"worker","role":"worker"}"""))
+        assertTrue(repository.login("worker", "synthetic") is Outcome.Success)
+        server.takeRequest(); server.takeRequest()
+        server.enqueue(reply("""{"ok":true}"""))
+        repository.logout()
+        assertEquals("session=path-cookie", server.takeRequest().getHeader("Cookie"))
+    }
     @Test fun legacyErrorAndUnauthorizedRestore() = runBlocking {
         server.enqueue(reply("""{"detail":"Неверный логин или пароль"}""", 401))
         val result = repository.login("worker", "bad") as Outcome.Failure

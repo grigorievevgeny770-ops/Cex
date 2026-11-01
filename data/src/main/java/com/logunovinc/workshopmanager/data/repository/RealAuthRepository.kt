@@ -17,7 +17,7 @@ class RealAuthRepository(
     private val errors: ApiErrorMapper,
     private val allowLocalHttp: Boolean,
     defaultUrl: String,
-) : AuthRepository {
+) : AuthRepository, CurrentSession {
     private val mutableSession = MutableStateFlow(SessionState())
     override val session = mutableSession.asStateFlow()
     private val mutableEnvironment = MutableStateFlow(defaultUrl)
@@ -27,6 +27,14 @@ class RealAuthRepository(
     private var initialized = false
     private val jar get() = factory.cookieJar
     private data class Context(val baseUrl: String, val generation: Long)
+    override val profiles: Flow<SessionSnapshot?> = combine(session, environment) { _, _ -> snapshot() }.distinctUntilChanged()
+    override fun snapshot(): SessionSnapshot? = synchronized(transitionLock) {
+        session.value.actor?.let { SessionSnapshot(environment.value, it.id, jar.generation()) }
+    }
+    override fun matches(snapshot: SessionSnapshot): Boolean = synchronized(transitionLock) {
+        snapshot == snapshot()
+    }
+    override fun invalidate(generation: Long) { unauthorized(generation) }
     private fun context() = synchronized(transitionLock) { Context(environment.value, jar.generation()) }
     private fun commit(context: Context, block: () -> Unit): Boolean = synchronized(transitionLock) {
         jar.commitIfCurrent(context.generation, block)
@@ -105,7 +113,7 @@ class RealAuthRepository(
             initialize()
             val (snapshot, cookie, loggedOutContext) = synchronized(transitionLock) {
                 val before = Context(environment.value, jar.generation())
-                val oldCookie = jar.header(before.baseUrl.toHttpUrl())
+                val oldCookie = jar.header(before.baseUrl.toHttpUrl().resolve("auth/logout")!!)
                 val generation = jar.invalidate { mutableSession.value = SessionState(restoring = false) }
                 Triple(before, oldCookie, Context(before.baseUrl, generation))
             }

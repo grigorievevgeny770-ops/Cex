@@ -17,15 +17,17 @@ import kotlinx.serialization.json.Json
 @Module
 @InstallIn(SingletonComponent::class)
 object ApplicationModule {
-    private const val DEFAULT_URL = BuildConfig.DEFAULT_BASE_URL
+    private val DEFAULT_URL = BuildConfig.DEFAULT_BASE_URL
     @Provides @Singleton fun json(): Json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
     @Provides @Singleton fun cookieStorage(@ApplicationContext context: Context): CookieStorage = EncryptedCookieStorage(context)
     @Provides @Singleton fun cookieJar(storage: CookieStorage) = PersistentSessionCookieJar(storage)
     @Provides @Singleton fun apiFactory(json: Json, jar: PersistentSessionCookieJar) = ApiFactory(json, jar)
     @Provides @Singleton fun errors(json: Json) = ApiErrorMapper(json)
     @Provides @Singleton fun environment(@ApplicationContext context: Context): EnvironmentSettings = DataStoreEnvironmentSettings(context, DEFAULT_URL)
-    @Provides @Singleton fun auth(settings: EnvironmentSettings, factory: ApiFactory, errors: ApiErrorMapper): AuthRepository =
+    @Provides @Singleton fun realAuth(settings: EnvironmentSettings, factory: ApiFactory, errors: ApiErrorMapper): RealAuthRepository =
         RealAuthRepository(settings, factory, errors, BuildConfig.DEBUG, DEFAULT_URL)
+    @Provides @Singleton fun auth(repository: RealAuthRepository): AuthRepository = repository
+    @Provides @Singleton fun currentSession(repository: RealAuthRepository): CurrentSession = repository
     @Provides fun login(repository: AuthRepository) = LoginUseCase(repository)
     @Provides fun restore(repository: AuthRepository) = RestoreSessionUseCase(repository)
     @Provides fun logout(repository: AuthRepository) = LogoutUseCase(repository)
