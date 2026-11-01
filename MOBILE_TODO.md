@@ -2,7 +2,7 @@
 Контракт пользователя: 01.11.2026. Самостоятельное Android-приложение worker.
 
 - [x] 0. Аудит среды и read-only capability API
-- [ ] 1. Модули, Compose, DI, навигация, собираемый debug
+- [x] 1. Модули, Compose, DI, навигация, собираемый debug
 - [ ] 2. DTO, HTTP, точные числа, защищённая cookie-сессия, Login/Restore/Logout
 - [ ] 3. Room PendingCommand, dispatcher, exact retry/recovery до write UI
 - [ ] 4. Workshop resolver, task list/detail/start/full history
