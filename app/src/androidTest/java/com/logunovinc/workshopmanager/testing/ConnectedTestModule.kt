@@ -31,11 +31,11 @@ object ConnectedTestModule {
     @Provides @Singleton fun factory(json: Json, jar: PersistentSessionCookieJar) = ApiFactory(json, jar)
     @Provides @Singleton fun errors(json: Json) = ApiErrorMapper(json)
     @Provides @Singleton fun settings(): EnvironmentSettings = object : EnvironmentSettings {
-        private var url = FixtureRuntime.backend.baseUrl
+        private var url = ConnectedBackendConfig.baseUrl
         override suspend fun read() = url
         override suspend fun write(baseUrl: String) { url = baseUrl }
     }
-    @Provides @Singleton fun realAuth(settings: EnvironmentSettings, factory: ApiFactory, errors: ApiErrorMapper) = RealAuthRepository(settings, factory, errors, true, FixtureRuntime.backend.baseUrl)
+    @Provides @Singleton fun realAuth(settings: EnvironmentSettings, factory: ApiFactory, errors: ApiErrorMapper) = RealAuthRepository(settings, factory, errors, true, ConnectedBackendConfig.baseUrl)
     @Provides @Singleton fun auth(repository: RealAuthRepository): AuthRepository = repository
     @Provides @Singleton fun current(repository: RealAuthRepository): CurrentSession = repository
     @Provides fun taskDebugOptions() = TaskDebugOptions()

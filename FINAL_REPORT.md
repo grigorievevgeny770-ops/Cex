@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 110 JVM-тест, 4 device-теста: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 110 JVM-тестов, 4 обычных device-теста и 1 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -31,7 +31,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Ограничения и открытые решения
 
-- Живые write-сценарии, worker ACL и server stock/recipe транзакции настоящего backend не проверялись. Нужны отдельный fixture backend и worker от владельца; общая БД не изменялась.
+- Реальные операции проверены на изолированном FastAPI/SQLite из backend dc7e140: два worker, приёмка/норма/прототип/отправка и сверка API/БД. Общая БД и обычный сервер8000 не менялись. Live negative/race/fault сценарии этим smoke-набором покрыты не полностью; они остаются в unit/contract-тестах.
 - Локальный backend обновился во время разработки: 116 paths/3 production v2 POST. Удалённый: 68 paths, workshop/v2 отсутствуют. Deployment не выполнялся.
 - Device-проверки — API37; отдельного device-прогона API26 не было.
 - НУЖНО СОГЛАСОВАТЬ: порог 3 буквы/цифры для причины недостачи, release HTTPS BASE_URL, серверную политику обрезков/брака/листовых партий. См. DECISIONS.md.
@@ -66,3 +66,28 @@ Manual task lifecycle removed: no TaskStatus/domain assignment/start producer, n
 Warehouse list/detail no longer display reserved quantities, reserved sheets or unallocated reserved amounts. Physical/free server values remain; data contracts and server reserve accounting are unchanged. Independent110tests/lint/build passed; normal debug APK updated on emulator.
 
 Refresh validation fixed: removed unsupported active_only query. Authenticated read reproduced old request422(query.active_only extra_forbidden) and corrected request200. Isolated diagnostic auth session closed; no inventory/task mutations. Emulator refresh gesture left the task screen free of the validation error. Independent110tests/lint/build and22fixture-schema checks passed.
+
+## Настоящий backend без MockWebServer
+
+Запуск из корня Android-проекта:
+
+```sh
+/opt/homebrew/bin/python3.12 scripts/check-real-backend-ui.py \
+  --backend /Users/chulkova/PetProjects/sklad \
+  --serial emulator-5554 \
+  --output /tmp/tseh-real-ui-$(date +%s)
+```
+
+Независимый отчёт: `/tmp/workshop-real-backend-final-review/result.json`.
+Backend revision: `dc7e140afb4d44e3fdb939ed4ae1d7d6d2af05b1`.
+Реальные worker UI-команды: приёмка4 + ещё5 final (недостача1, разные worker),
+fixed расход6/выпуск3, prototype расход4/выпуск2 + расход6/выпуск3,
+dispatch3 изготовленных изделий. Сохранена норма4на2, learned execution4.
+Всего6фактов/3производственных документа; материал43, fixed0, prototype5;
+отправка3 в пути, принято0, потери0, assigned_to NULL.
+
+Каждый запуск архивирует неизменённый backend HEAD в новый temp-каталог,
+создаёт SQLite/аккаунты/данные только там и останавливает свой uvicorn после
+проверки. Launcher не принимает URL существующего сервера. Read-only
+attestation привязывает UI к owned marker/revision до входа. Обычный набор
+из4device-тестов не запускает live-тест неявно и не пропускает его через skip.

@@ -42,3 +42,6 @@ The app no longer creates /start requests or sends status/assignee filters. New 
 
 ## 2026-11-02 — live contract and refresh fix
 The local runtime is updated:136paths, TaskRead is_completed/is_cancelled, no /start endpoint. GETtasks accepts only view(active/history/all), type, warehouse_id, limit and offset. Its query model forbids unknown parameters: active_only=true produces422 VALIDATION_ERROR, loc=query.active_only, extra_forbidden. The app now sends view=active without active_only. Separate authenticated read confirmed corrected request200; no stock/task mutations.22canonical production fixtures passed jsonschema against the new live OpenAPI snapshot. Earlier pending-rollout notes above are historical and superseded for local API availability.
+
+## Actual backend integration acceptance
+2026-11-02: production HTTP/repositories and Compose verified against unmodified archived backend dc7e140 with its actual FastAPI/SQLite business stack. Owned fixture runtime only: receive4+5final/shortage1 by two workers, fixed6→3, prototype4→2 then6→3, finished-product dispatch3/in-transit. API and own DB postconditions passed; no business endpoint responses mocked. Shared server8000/DB were not modified. New runner metadata attestation is test-only and absent from business contract/normal APK.

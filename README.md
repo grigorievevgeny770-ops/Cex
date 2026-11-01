@@ -5,8 +5,9 @@
 Hilt, Retrofit/OkHttp, Kotlin Serialization, Room и DataStore.
 
 На 01.11.2026 production v2 подтверждён read-only локальным OpenAPI и
-исходниками backend. Клиент проверен на synthetic fixtures/MockWebServer;
-живая интеграция с выделенным backend/worker ещё не выполнялась. Старые
+исходниками backend. Клиент проверен на synthetic fixtures/MockWebServer и настоящем FastAPI
+в отдельной временной SQLite БД: приёмка двумя работниками, отправка,
+готовая норма и первый прототип с последующим автоматическим выпуском. Старые
 серверы без v2 и legacy manual manufacture остаются явно неподдерживаемыми.
 Текущее состояние окружений и открытые решения: `API_CONTRACT.md`,
 `DECISIONS.md`, `MOBILE_TODO.md`, `STAGE_LOG.md`, `TEST_MATRIX.md`.
@@ -187,13 +188,59 @@ fixture исключительно на loopback, собирает/устана�
 его настройки скрипт не очищает. Без явного fixtureBaseUrl этот вариант
 направлен на закрытый `http://127.0.0.1:9/`, а не на рабочий backend.
 
-Проверены 110 unit/contract/VM/Room тест и 4 connected теста. Все write
-проверки — synthetic; пользовательская/удалённая БД не изменялась. Живая
-сквозная приёмка main→workshop→manufacture→dispatch на выделенном backend
-остаётся отдельной интеграционной проверкой после provisioning владельцем.
+Проверены 110 unit/contract/VM/Room тестов, 4 обычных connected-теста и
+отдельный Compose E2E на настоящем изолированном FastAPI/SQLite. Сквозная
+приёмка main→workshop→manufacture→dispatch прошла с синтетическими данными
+на реальном бизнес-коде backend. Пользовательская/удалённая БД не менялась.
 
 Официальные справочники: [AGP](https://developer.android.com/build/releases/agp-9-5-0-release-notes),
 [Compose BOM](https://developer.android.com/develop/ui/compose/bom),
 [Hilt](https://dagger.dev/hilt/gradle-setup),
 [AndroidX Test](https://developer.android.com/jetpack/androidx/releases/test),
 [Room](https://developer.android.com/jetpack/androidx/releases/room).
+
+## UI-проверка с настоящим backend
+
+Отдельный opt-in запуск использует настоящий FastAPI/uvicorn и бизнес-код
+локального репозитория `sklad`, без MockWebServer и подмены API-ответов:
+
+```sh
+/opt/homebrew/bin/python3.12 scripts/check-real-backend-ui.py \
+  --backend /Users/chulkova/PetProjects/sklad \
+  --serial emulator-5554 \
+  --output /tmp/tseh-real-backend-unique-run
+```
+
+Нужны Python 3.12+, рабочий `sklad/code/.venv/bin/python` с зависимостями
+backend, Git, Android SDK и выделенный запущенный эмулятор. Каталог output
+должен быть новым и находиться в системном временном каталоге. Скрипт
+архивирует закреплённый HEAD backend в этот каталог, проверяет hash архива,
+создаёт marker/manifest, новую SQLite БД, локальные каталоги данных и
+синтетические аккаунты. Исходники backend не меняются. Запускаются его
+обычные startup/migrations и uvicorn на случайном loopback-порту; обращения
+к внешней сети и SQLite вне fixture запрещены. Порт 8000 и URL существующего
+сервера принять невозможно. По завершении сервер останавливается; каталог
+остаётся для проверки `result.json`, `instrumentation.log`, `server.log`,
+`dispatch-transfer.json`, screenshots и собственной БД. Эти данные не
+добавляются в Git.
+
+Compose проходит реальный вход worker, приёмку 4, пересоздание Activity без
+повторной команды, вход другого worker и финальную приёмку ещё 5 с недостачей
+1; затем выпуск 3 по норме 20/10, прототип 2 с материалами 4 и следующий выпуск
+3 автоматически, отправку 3 готовых изделий и обновление склада. Проверки API/БД подтверждают
+шесть фактов, три производственных документа, разных авторов приёмки,
+неутверждённую недостачу, отсутствие потерь и назначений, конечные остатки
+цеха (материал 43, изделия 0 и 5), отсутствие зачисления отправки на main.
+
+Обычный runner исключает класс с `@RealBackendOnly` из default suite.
+Явный запуск `RealBackendConnectedTest` без корректных opt-in аргументов
+завершается ошибкой до входа. Launcher и Android проверяют read-only
+attestation endpoint с hash случайного marker и закреплённой ревизией
+до любого входа/записи. Endpoint — только метаданные тестового запуска;
+все бизнес-ответы возвращает настоящий backend. Обычные
+четыре connected-проверки с MockWebServer/Keystore/Room остаются быстрым
+независимым набором. Реальный набор использует production HTTP/repositories,
+а тестовая DI меняет только адрес, пустые настройки prefill/debug history,
+хранилище cookie и Room; тестовые аккаунты не попадают в обычную сессию
+приложения. Запуск устанавливает debug/test APK на выделенный эмулятор.
+Он не выполняет вход и складские операции на рабочем сервере.
