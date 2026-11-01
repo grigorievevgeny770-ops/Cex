@@ -35,3 +35,9 @@
 - Closed on 2026-11-02: updated local backend contract is live (completion flags, no start endpoint). Cross-worker live write acceptance still requires a dedicated fixture backend. Android did not modify/deploy the backend.
 
 - Current server query contract is strict: only view/type/warehouse_id/limit/offset. Removed compatibility active_only after authenticated422 reproduction; unsupported query parameters must not be sent for speculative compatibility.
+
+## 2026-11-02 — закрытие невыполненного остатка
+- Реализуется отдельная worker-команда close-incomplete, а не start/assign/cancel или фиктивный складской факт. Разрешение определяет allowed_actions; приёмка исключена.
+- Для доступа к закрытым заданиям добавлена серверная навигация Доступные / История заданий / Все. Это чтение архивных задач; ручное управление статусами не возвращается.
+- Причина trim перед подтверждением, проверяется по Unicode code points (1..2000); подтверждённые байты неизменяемы. Новая причина/версия требует нового явного подтверждения после определённого отказа. Неопределённая команда блокирует замену.
+- Capability OpenAPI проверяется только при закрытии в выбранном окружении, без автоматического перехода на удалённый сервер. Отрицательный результат можно перепроверить после rollout.

@@ -13,3 +13,8 @@
 - [x] 9. Regression, Compose E2E, lint, APK, передача
 
 На каждом этапе исполнитель пишет application code и tests; супервизор проверяет и делает локальный commit. Push/deploy не разрешены. Локальный backend v2 появился во время этапа8; живая write-интеграция ожидает выделенный synthetic backend/worker.
+
+## Дополнение: закрытие без полного выполнения
+- [x] Domain/DTO/UseCase/Repository/RemoteDataSource, capability gate и durable close command.
+- [x] Диалог причины и серверные active/history/all списки; закрытый остаток не считается выполненным.
+- [x] Независимая Compose/real fixture приёмка закрытия и baseline; APK установлен, этап готов к локальному commit.

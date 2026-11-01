@@ -21,6 +21,8 @@ class TaskMapper {
             dueAt = value.dueAt?.let(::instant), comment = value.comment, sourceWarehouseId = value.sourceWarehouseId,
             targetWarehouseId = value.targetWarehouseId, transferId = value.transferId, transferVersion = value.transferVersion,
             manufacturingOrderId = value.manufacturingOrderId, outcome = value.outcome, lines = value.lines.map(::line),
+            isClosedIncomplete = value.isClosedIncomplete, closedIncompleteReason = value.closedIncompleteReason,
+            closedIncompleteBy = value.closedIncompleteBy, closedIncompleteAt = value.closedIncompleteAt?.let(::instant),
             allowedActions = value.allowedActions.toSet(), production = value.production?.let { ProductionMapper().descriptor(it) },
             executions = value.executions.map(::execution), history = value.history.map(::history),
             discrepancies = value.discrepancies.map { Discrepancy(it.id, it.status, it.missing, it.unresolved, it.reason) })

@@ -17,6 +17,8 @@ object TasksModule {
     @Provides @Singleton fun mapper() = TaskMapper()
     @Provides @Singleton fun warehouses(remote: WorkshopRemoteDataSource): WarehouseRepository = RealWarehouseRepository(remote)
     @Provides @Singleton fun tasks(remote: WorkshopRemoteDataSource, mapper: TaskMapper, dispatcher: CommandDispatcher, json: Json, errors: ApiErrorMapper): TaskRepository = RealTaskRepository(remote, mapper, dispatcher, json, errors)
+    @Provides fun closeIncomplete(repository: TaskRepository) = CloseIncompleteTaskUseCase(repository)
+    @Provides fun closeCapability(repository: TaskRepository) = CheckCloseIncompleteCapabilityUseCase(repository)
     @Provides fun prepareManufacturing() = PrepareManufacturingUseCase()
     @Provides fun previewManufacturing(repository: TaskRepository) = PreviewManufacturingUseCase(repository)
     @Provides fun executeManufacturing(repository: TaskRepository) = ExecuteManufacturingUseCase(repository)

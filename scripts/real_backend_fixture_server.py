@@ -62,6 +62,17 @@ def fixture_attestation():
             'tokenSha256': hashlib.sha256(marker['token'].encode()).hexdigest()}
 
 
+@application.get('/_tseh_test_fixture/accounting', include_in_schema=False)
+def fixture_accounting():
+    """Read-only evidence from the owned SQLite DB; never substitutes a business response."""
+    from sqlalchemy import text
+    tables = ('inventory_movements', 'inventory_transfer_receipts', 'inventory_transfer_receipt_lines',
+              'inventory_production_documents', 'inventory_loss_documents', 'inventory_loss_lines',
+              'workshop_task_executions')
+    with SessionLocal() as db:
+        return {table: db.scalar(text(f'SELECT count(*) FROM {table}')) for table in tables}
+
+
 startup()
 from app.core.models import Supplier, Category, Product, User, Role
 from app.core.auth import hash_password

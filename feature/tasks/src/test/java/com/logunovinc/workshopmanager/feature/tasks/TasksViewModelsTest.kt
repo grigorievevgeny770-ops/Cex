@@ -22,6 +22,11 @@ class TasksViewModelsTest {
         override suspend fun warehouses() = result
     }
     private open class Tasks : TaskRepository {
+        var capability: Outcome<Boolean> = Outcome.Success(true)
+        var closeCalls=0
+        var closing: suspend (Task,String) -> CommandOutcome = { _,_ -> error("unused") }
+        override suspend fun closeIncompleteCapability(): Outcome<Boolean> = capability
+        override suspend fun closeIncomplete(task: Task, reason: String): CommandOutcome { closeCalls++;return closing(task,reason) }
         var reads = 0
         var taskCalls = 0
         var historyReads = 0
@@ -82,7 +87,7 @@ class TasksViewModelsTest {
     private fun detail(tasks: Tasks, debug: Boolean = false, pending: PendingCommandRepository = object : PendingCommandRepository {
         override fun observe() = kotlinx.coroutines.flow.flowOf(emptyList<PendingCommand>())
         override suspend fun retry(commandId: String): CommandOutcome = error("unused")
-    }) = TaskDetailViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), LoadExecutionsUseCase(tasks), LoadHistoryUseCase(tasks), pending, TaskDebugOptions(showHistoryAvailable = debug))
+    }) = TaskDetailViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), LoadExecutionsUseCase(tasks), LoadHistoryUseCase(tasks), pending, CheckCloseIncompleteCapabilityUseCase(tasks), CloseIncompleteTaskUseCase(tasks), TaskDebugOptions(showHistoryAvailable = debug))
     @Test fun detailReadsAndAllowsDirectExecutionWithoutAnyLifecycleMutation() = runTest(dispatcher) {
         val tasks = Tasks()
         val vm = detail(tasks)
@@ -198,6 +203,81 @@ class TasksViewModelsTest {
         assertFalse(vm.uiState.value.debugHistoryExpanded)
         assertTrue(vm.uiState.value.history.isEmpty())
         assertEquals(2, tasks.historyReads)
+    }
+
+    @Test fun closeDialogDismissAndInvalidReasonsNeverSendAndFlightRejectsDoubleTap() = runTest(dispatcher) {
+        val tasks=Tasks()
+        val base=sampleTask(type=TaskType.DISPATCH_GOODS,actions=setOf("execute","close_incomplete"))
+        tasks.reading={ Outcome.Success(base) }
+        val gate=CompletableDeferred<Unit>()
+        var sentReason=""
+        tasks.closing={ task,reason ->
+            sentReason=reason;gate.await()
+            tasks.reading={ Outcome.Success(task.copy(version=9,isClosedIncomplete=true,closedIncompleteReason=reason)) }
+            CommandOutcome.Confirmed(CommandConfirmation("close",task.id,9,null,false))
+        }
+        val vm=detail(tasks);runCurrent()
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);runCurrent()
+        assertNotNull(vm.uiState.value.closeDialog);assertFalse(vm.uiState.value.executionAvailable)
+        vm.onIntent(TaskDetailIntent.DismissClose);assertEquals(0,tasks.closeCalls)
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);runCurrent()
+        for(reason in listOf("   ","x".repeat(2001))) {
+            vm.onIntent(TaskDetailIntent.CloseReasonChanged(reason));vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent()
+            assertNotNull(vm.uiState.value.closeError);assertEquals(0,tasks.closeCalls)
+        }
+        vm.onIntent(TaskDetailIntent.CloseReasonChanged("  Больше не требуется  "))
+        vm.onIntent(TaskDetailIntent.ConfirmClose);vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent()
+        assertEquals(1,tasks.closeCalls);assertTrue(vm.uiState.value.closeSending)
+        assertFalse(vm.uiState.value.closeAvailable);assertFalse(vm.uiState.value.executionAvailable)
+        vm.onIntent(TaskDetailIntent.DismissClose);vm.onIntent(TaskDetailIntent.CloseReasonChanged("Изменить нельзя"));vm.onIntent(TaskDetailIntent.Refresh)
+        assertEquals("Больше не требуется",vm.uiState.value.closeDialog?.reason)
+        gate.complete(Unit);runCurrent()
+        assertEquals("Больше не требуется",sentReason);assertEquals(9L,vm.uiState.value.task?.version)
+        assertTrue(vm.uiState.value.task!!.isClosedIncomplete);assertFalse(vm.uiState.value.closeAvailable);assertFalse(vm.uiState.value.executionAvailable)
+    }
+    @Test fun closeConflictRefreshesAndNeedsAnotherExplicitConfirmationUsingFreshTask() = runTest(dispatcher) {
+        val tasks=Tasks();val base=sampleTask(type=TaskType.DISPATCH_GOODS,actions=setOf("execute","close_incomplete"))
+        tasks.reading={ Outcome.Success(base) }
+        val versions=mutableListOf<Long>()
+        tasks.closing={ task,_ ->
+            versions+=task.version
+            tasks.reading={ Outcome.Success(base.copy(version=8)) }
+            CommandOutcome.Rejected(null,AppError(ErrorKind.CONFLICT,"Другой сотрудник выполнил часть", "DOCUMENT_STATE_CONFLICT",409))
+        }
+        val vm=detail(tasks);runCurrent()
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);runCurrent();vm.onIntent(TaskDetailIntent.CloseReasonChanged("Закончить"));vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent()
+        assertEquals(listOf(3L),versions);assertEquals(8L,vm.uiState.value.task?.version);assertNull(vm.uiState.value.closeDialog)
+        vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent();assertEquals(1,tasks.closeCalls)
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);runCurrent();vm.onIntent(TaskDetailIntent.CloseReasonChanged("Сверено"));vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent()
+        assertEquals(listOf(3L,8L),versions)
+    }
+    @Test fun missingCapabilityAndUnknownCloseBlockNewConfirmWithoutChangingSavedRequest() = runTest(dispatcher) {
+        val tasks=Tasks();val base=sampleTask(type=TaskType.MANUFACTURE_PRODUCT,actions=setOf("close_incomplete"))
+        tasks.reading={ Outcome.Success(base) };tasks.capability=Outcome.Success(false)
+        val vm=detail(tasks);runCurrent();assertTrue(vm.uiState.value.closeAvailable)
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);runCurrent();assertNull(vm.uiState.value.closeDialog);assertEquals(ErrorKind.INCOMPATIBLE_SERVER,vm.uiState.value.closeError?.kind)
+        tasks.capability=Outcome.Success(true)
+        val command=PendingCommand("original",101,"CLOSE_INCOMPLETE",CommandSummary("Закрыть остаток",listOf("Версия 3"),"Сохранённая причина"),PendingState.UNKNOWN,Instant.EPOCH,1)
+        tasks.closing={ _,reason -> assertEquals("Сохранённая причина",reason);CommandOutcome.Unresolved(command,AppError(ErrorKind.NETWORK,"Исход неизвестен")) }
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);runCurrent();vm.onIntent(TaskDetailIntent.CloseReasonChanged("Сохранённая причина"));vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent()
+        assertEquals(command,vm.uiState.value.pending);assertFalse(vm.uiState.value.closeAvailable)
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent();assertEquals(1,tasks.closeCalls)
+    }
+
+    @Test fun recoveredCloseAckClearsUnknownErrorAndUsesFreshClosedTaskWithoutAnotherSubmit() = runTest(dispatcher) {
+        val tasks=Tasks();val base=sampleTask(type=TaskType.DISPATCH_GOODS,actions=setOf("execute","close_incomplete"))
+        tasks.reading={ Outcome.Success(base) }
+        val command=PendingCommand("saved-close",101,"CLOSE_INCOMPLETE",CommandSummary("Закрыть",emptyList(),"Исходная причина"),PendingState.UNKNOWN,Instant.EPOCH,1)
+        val commands=kotlinx.coroutines.flow.MutableStateFlow(emptyList<PendingCommand>())
+        val journal=object:PendingCommandRepository { override fun observe()=commands;override suspend fun retry(commandId:String):CommandOutcome=error("explicit recovery only") }
+        tasks.closing={ _,_ -> CommandOutcome.Unresolved(command,AppError(ErrorKind.NETWORK,"Исход неизвестен")) }
+        val vm=detail(tasks,pending=journal);runCurrent()
+        vm.onIntent(TaskDetailIntent.CloseIncompleteClick);runCurrent();vm.onIntent(TaskDetailIntent.CloseReasonChanged("Исходная причина"));vm.onIntent(TaskDetailIntent.ConfirmClose);runCurrent()
+        assertNotNull(vm.uiState.value.closeError)
+        tasks.reading={ Outcome.Success(base.copy(version=7,isClosedIncomplete=true,closedIncompleteReason="Исходная причина")) }
+        commands.value=listOf(command.copy(state=PendingState.ACKNOWLEDGED,confirmation=CommandConfirmation(command.id,101,7,null,true)));runCurrent()
+        assertNull(vm.uiState.value.pending);assertNull(vm.uiState.value.closeError);assertEquals(7L,vm.uiState.value.task?.version)
+        assertTrue(vm.uiState.value.task!!.isClosedIncomplete);assertFalse(vm.uiState.value.closeAvailable);assertFalse(vm.uiState.value.executionAvailable);assertEquals(1,tasks.closeCalls)
     }
 
 }

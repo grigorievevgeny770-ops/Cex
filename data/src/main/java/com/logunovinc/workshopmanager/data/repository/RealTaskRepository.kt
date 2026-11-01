@@ -16,6 +16,24 @@ class RealTaskRepository(private val remote: WorkshopRemoteDataSource, private v
         is Outcome.Success -> try { Outcome.Success(block(result.value)) } catch (error: Exception) { Outcome.Failure(errors.throwable(error)) }
     }
     override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long) = map(remote.tasks(warehouseId, filter, limit, offset)) { mapper.page(it, mapper::task) }
+    override suspend fun closeIncompleteCapability() = remote.closeIncompleteCapability()
+    override suspend fun closeIncomplete(task: Task, reason: String): CommandOutcome {
+        if (!task.canCloseIncomplete) return CommandOutcome.Rejected(null, AppError(ErrorKind.FORBIDDEN, "Закрытие остатка недоступно"))
+        val validated = when (val result = CloseIncompleteReason.validate(reason)) {
+            is Outcome.Failure -> return CommandOutcome.Rejected(null, result.error)
+            is Outcome.Success -> result.value
+        }
+        val profile = remote.sessionSnapshot() ?: return CommandOutcome.Rejected(null, AppError(ErrorKind.AUTHENTICATION, "Требуется вход"))
+        when (val capability = remote.closeIncompleteCapability()) {
+            is Outcome.Failure -> return CommandOutcome.Rejected(null, capability.error)
+            is Outcome.Success -> if (!capability.value) return CommandOutcome.Rejected(null, AppError(ErrorKind.INCOMPATIBLE_SERVER, "Сервер ещё не поддерживает закрытие остатка задания"))
+        }
+        val summary = CommandSummary("Закрыть остаток · задание №${task.id}",
+            task.lines.map { "${it.productName}: план ${it.planned.toPlainString()}, факт ${it.actual.toPlainString()}, остаток ${it.remaining.toPlainString()} ${it.baseUnit.orEmpty()}" } + "Версия задания ${task.version}", validated)
+        return dispatcher.submit(task.id, "CLOSE_INCOMPLETE", "POST", "api/workshop/tasks/${task.id}/close-incomplete", summary, expectedSession = profile) { token ->
+            json.encodeToString(CloseIncompleteRequestDto(task.version, token, validated)).toByteArray(Charsets.UTF_8)
+        }
+    }
     override suspend fun task(id: Long) = map(remote.task(id), mapper::task)
     private val productionMapper = ProductionMapper()
     override suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview> = when (command) {

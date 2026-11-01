@@ -19,6 +19,8 @@ class ReceiveExecutionViewModelTest {
     @Before fun before() { Dispatchers.setMain(dispatcher) }
     @After fun after() { Dispatchers.resetMain() }
     private class Tasks : TaskRepository {
+        override suspend fun closeIncompleteCapability(): Outcome<Boolean> = error("unused")
+        override suspend fun closeIncomplete(task: Task, reason: String): com.logunovinc.workshopmanager.domain.pending.CommandOutcome = error("unused")
         var count = 0
         var reads = 0
         var command: ReceiveCommand? = null

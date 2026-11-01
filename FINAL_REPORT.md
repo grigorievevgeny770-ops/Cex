@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 945 409 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 15 150 467 байт.
 
-SHA256: `e712603bc2e50ef4f4e0f129a5b195edf5f81349d39181a08acb080e746fdc33`.
+SHA256: `be38df6f720fc429c5a4ca6b86c432a815069f9cbf5ec065b9404249dbeff7b2`.
 
 APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
 
@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 110 JVM-тестов, 4 обычных device-теста и 1 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 124 JVM-теста, 6 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -91,3 +91,13 @@ dispatch3 изготовленных изделий. Сохранена норм
 проверки. Launcher не принимает URL существующего сервера. Read-only
 attestation привязывает UI к owned marker/revision до входа. Обычный набор
 из4device-тестов не запускает live-тест неявно и не пропускает его через skip.
+
+## Закрытие без полного выполнения
+
+Добавлены worker-действие close_incomplete, диалог с обязательной причиной, immutable durable POST и серверная история закрытых задач. Приёмка исключена. Closed metadata/UTC и реальные remaining сохраняются; закрытие не считается полным выполнением. Timeout/restart сохраняет UUID/body/profile; idempotency conflict удерживает блокировку для сверки. Локальная default URL остаётся http://10.0.2.2:8000/, автоматического remote fallback нет.
+
+Независимый actual backend Compose прогон: /tmp/tseh-close-root-real-review/result.json (PASS, backend adf37594383132e57669c45180fb47fad494c1f9). Пять случаев: dispatch10/20, dispatch0/20, fixed3/10, prototype0/10 и2/10. До/после каждого close одинаковы счётчики движений, приёмок, потерь, production документов и execution фактов. Задачи исчезают из active и доступны в history с остатками10/20/7/10/8. Read-only OpenAPI для capability загружается без worker-cookie, business requests используют прежнюю защищённую cookie-сессию.
+
+Ошибки сети/прав/версий и Room reopen проверены синтетическими тестами, без внедрения отказов в пользовательский backend. Админские замечания и Telegram в этот объём не входят. Общий backend/его БД не изменялись.
+
+Прежний actual-backend E2E независимо повторён после изменений: /tmp/tseh-close-root-baseline-review/result.json PASS. Финальный root verify: /tmp/tseh-close-root-final-check.log; APK переустановлен и запущен как обычное приложение (без instrumentation). Текущий локальный commit: `git log -1 --oneline`; новый этап не требует дополнительных согласований. Удалённое окружение этим запуском не проверялось.

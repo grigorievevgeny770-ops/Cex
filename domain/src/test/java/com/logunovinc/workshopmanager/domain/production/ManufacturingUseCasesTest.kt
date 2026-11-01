@@ -10,6 +10,8 @@ import org.junit.Assert.*
 
 class ManufacturingUseCasesTest {
     private class Repository : TaskRepository {
+        override suspend fun closeIncompleteCapability(): Outcome<Boolean> = error("unused")
+        override suspend fun closeIncomplete(task: Task, reason: String): com.logunovinc.workshopmanager.domain.pending.CommandOutcome = error("unused")
         var previews = 0
         var writes = 0
         var previewResult: ManufacturingPreview? = null

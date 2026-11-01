@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -40,6 +41,11 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
             TextButton(onClick = onRecoveryClick) { Text("Журнал запросов") }
         }
         state.warehouse?.let { Text(it.name, style = MaterialTheme.typography.bodySmall) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(TaskView.ACTIVE to "Доступные", TaskView.HISTORY to "История заданий", TaskView.ALL to "Все").forEach { (view, title) ->
+                FilterChip(selected = state.filter.view == view, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(view = view))) }, label = { Text(title) })
+            }
+        }
         var menu by remember { mutableStateOf(false) }
         Box {
             OutlinedButton(onClick = { menu = true }) { Text(state.filter.type?.title() ?: "Все типы") }
@@ -52,12 +58,16 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error); TextButton(onClick = { onIntent(TaskListIntent.Refresh) }) { Text("Повторить загрузку") } }
         PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = { onIntent(TaskListIntent.Refresh) }, modifier = Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
+            LazyColumn(Modifier.fillMaxSize().testTag("task-list"), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
                 if (!state.loading && state.error == null && state.items.isEmpty()) item { Text("Доступных заданий пока нет. Потяните вниз для обновления") }
                 items(state.items, key = Task::id) { task ->
                     Card(Modifier.fillMaxWidth().clickable { onTaskClick(task.id) }) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("№${task.id} · ${task.type.title()}", style = MaterialTheme.typography.titleMedium)
+                            if (task.isClosedIncomplete) {
+                                Text("Закрыта без полного выполнения", color = MaterialTheme.colorScheme.primary)
+                                task.closedIncompleteReason?.let { Text("Причина: $it") }
+                            }
                             task.lines.take(3).forEach { line ->
                                 Text(line.productName)
                                 Text("План ${QuantityFormatter.format(line.planned)} · факт ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}", style = MaterialTheme.typography.bodySmall)

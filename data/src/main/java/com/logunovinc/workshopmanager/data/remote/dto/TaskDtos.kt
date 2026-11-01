@@ -28,6 +28,10 @@ import kotlinx.serialization.json.JsonObject
     val outcome: String? = null, val lines: List<TaskLineDto>,
     @SerialName("allowed_actions") val allowedActions: List<String>,
     val production: ProductionDescriptorDto? = null,
+    @SerialName("is_closed_incomplete") val isClosedIncomplete: Boolean = false,
+    @SerialName("closed_incomplete_reason") val closedIncompleteReason: String? = null,
+    @SerialName("closed_incomplete_by") val closedIncompleteBy: Long? = null,
+    @SerialName("closed_incomplete_at") val closedIncompleteAt: String? = null,
     val executions: List<ExecutionDto> = emptyList(), val history: List<HistoryDto> = emptyList(),
     val discrepancies: List<DiscrepancyDto> = emptyList(),
 )
@@ -73,3 +77,12 @@ import kotlinx.serialization.json.JsonObject
     @SerialName("missing_qty") val missing: BigDecimal,
     @SerialName("unresolved_qty") val unresolved: BigDecimal, val reason: String)
 @Serializable data class TaskResponseDto(val result: CommandResultDto, val task: TaskDto)
+
+@Serializable data class CloseIncompleteRequestDto(
+    @SerialName("expected_version") val expectedVersion: Long,
+    @SerialName("client_token") val clientToken: String,
+    val reason: String,
+)
+/** Only the path capability fragment is consumed, without exposing raw schema to domain/UI. */
+@Serializable data class WorkshopCapabilitiesDto(val paths: Map<String, WorkshopPathCapabilityDto>)
+@Serializable data class WorkshopPathCapabilityDto(val post: JsonObject? = null)

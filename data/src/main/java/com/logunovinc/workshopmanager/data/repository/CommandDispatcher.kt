@@ -34,9 +34,10 @@ class CommandDispatcher(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     /** Called only by data repositories; serializes once before the atomic durable prepare. */
-    suspend fun submit(taskId: Long, action: String, method: String, path: String, summary: CommandSummary, body: (String) -> ByteArray): CommandOutcome {
+    suspend fun submit(taskId: Long, action: String, method: String, path: String, summary: CommandSummary, expectedSession: SessionSnapshot? = null, body: (String) -> ByteArray): CommandOutcome {
         val profile = current.snapshot() ?: return unauthenticated()
-        if (taskId <= 0 || method != "POST" || !path.matches(Regex("/?api/workshop/(v2/)?tasks/$taskId/(executions|manufacturing-executions)")))
+        if (expectedSession != null && profile != expectedSession) return unauthenticated()
+        if (taskId <= 0 || method != "POST" || !(path.matches(Regex("/?api/workshop/(v2/)?tasks/$taskId/(executions|manufacturing-executions)")) || path.matches(Regex("/?api/workshop/tasks/$taskId/close-incomplete"))))
             return CommandOutcome.Rejected(null, AppError(ErrorKind.VALIDATION, "Недопустимая складская команда"))
         return locks.withTask(profile.baseUrl, profile.actorId, taskId) {
             if (!current.matches(profile)) return@withTask unauthenticated()
@@ -105,6 +106,7 @@ class CommandDispatcher(
             }
             val retrofitResponse = retrofit2.Response.error<Unit>(response.status, response.body.toResponseBody((response.contentType ?: "application/json").toMediaType()))
             val error = errors.response(retrofitResponse)
+            if (error.code == "IDEMPOTENCY_CONFLICT") return recordUncertain(attempt, error, PendingState.NEEDS_REVIEW)
             val deterministic = response.status in setOf(400, 401, 403, 404, 409, 422)
             if (deterministic && !priorUnknown) {
                 val rejected = attempt.copy(state = PendingState.REJECTED.name, lastError = mapper.error(error))

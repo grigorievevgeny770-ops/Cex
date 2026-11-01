@@ -230,4 +230,54 @@ class CommandDispatcherTest {
         assertArrayEquals(exact, room.get(saved.id)!!.body)
     }
 
+    @Test fun closeIncompleteUnknownSurvivesRoomReopenAndPermissionsErrorWithoutChangingReason() = runBlocking {
+        val context=ApplicationProvider.getApplicationContext<Context>()
+        val name="close-test-${UUID.randomUUID()}.db"
+        database.close()
+        database=Room.databaseBuilder(context,CommandDatabase::class.java,name).allowMainThreadQueries().build()
+        room=RoomCommandJournal(database)
+        val server=MockWebServer().apply { start() }
+        try {
+            session=FakeSession(server.url("/").toString())
+            val network=OkHttpCommandSender(ApiFactory(json,PersistentSessionCookieJar(MemoryCookies())),session)
+            server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+            val unknown=dispatcher(network).submit(101,"CLOSE_INCOMPLETE","POST","api/workshop/tasks/101/close-incomplete",summary) { token ->
+                """{"expected_version":3,"client_token":"$token","reason":"Исходная причина 😀"}""".toByteArray(Charsets.UTF_8)
+            } as CommandOutcome.Unresolved
+            val first=server.takeRequest().body.readByteArray()
+            val token=room.get(unknown.command.id)!!.clientToken
+            database.close()
+            database=Room.databaseBuilder(context,CommandDatabase::class.java,name).allowMainThreadQueries().build()
+            room=RoomCommandJournal(database)
+            for(status in listOf(401,403,409,422)) {
+                server.enqueue(MockResponse().setResponseCode(status).setHeader("Content-Type","application/json").setBody("""{"code":"IDEMPOTENCY_CONFLICT","message":"Нужна сверка"}"""))
+                assertTrue(dispatcher(network).retry(unknown.command.id) is CommandOutcome.Unresolved)
+                assertArrayEquals(first,checkNotNull(server.takeRequest(5,java.util.concurrent.TimeUnit.SECONDS)).body.readByteArray())
+                assertEquals(token,room.get(unknown.command.id)!!.clientToken)
+                assertNotNull(database.commands().active(server.url("/").toString(),42,101))
+                if (session.snapshot() == null) session.set(SessionSnapshot(server.url("/").toString(),42,0))
+            }
+            server.enqueue(MockResponse().setHeader("Content-Type","application/json").setBody(ack.replace("false","true")))
+            assertTrue(dispatcher(network).retry(unknown.command.id) is CommandOutcome.Confirmed)
+            assertArrayEquals(first,checkNotNull(server.takeRequest(5,java.util.concurrent.TimeUnit.SECONDS)).body.readByteArray())
+        } finally { server.shutdown();database.close();context.deleteDatabase(name) }
+    }
+
+    @Test fun initialIdempotencyConflictRetainsOriginalCloseAndBlocksAnyCompetingTaskCommand() = runBlocking {
+        var sends=0
+        val network=sender { sends++;RawCommandResponse(409,"application/json","""{"code":"IDEMPOTENCY_CONFLICT","message":"Нужна сверка"}""") }
+        val dispatcher=dispatcher(network)
+        val result=dispatcher.submit(101,"CLOSE_INCOMPLETE","POST","api/workshop/tasks/101/close-incomplete",summary) { token ->
+            """{"expected_version":3,"client_token":"$token","reason":"Первоначальная причина"}""".toByteArray()
+        } as CommandOutcome.Unresolved
+        val original=room.get(result.command.id)!!
+        assertEquals(PendingState.NEEDS_REVIEW,result.command.state)
+        val competing=submit(dispatcher) as CommandOutcome.Unresolved
+        val changed=dispatcher.submit(101,"CLOSE_INCOMPLETE","POST","api/workshop/tasks/101/close-incomplete",summary) { token ->
+            """{"expected_version":9,"client_token":"$token","reason":"Другая причина"}""".toByteArray()
+        } as CommandOutcome.Unresolved
+        assertEquals(result.command.id,competing.command.id);assertEquals(result.command.id,changed.command.id);assertEquals(1,sends)
+        assertArrayEquals(original.body,room.get(original.id)!!.body);assertEquals("https://example.com/",original.baseUrl);assertEquals(42L,original.actorId)
+    }
+
 }

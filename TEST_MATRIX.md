@@ -38,3 +38,17 @@
 Живые write-проверки: не разрешены на общей базе, нужен отдельный fixture backend. Локальные v2 routes появились во время разработки и сверены с fixtures. Реальная write-интеграция теперь пройдена на отдельном owned backend с двумя worker; результаты не относятся к общей пользовательской БД.
 
 2026-11-02: реальная write-интеграция выполнена на отдельном owned FastAPI/SQLite, backend dc7e140. См. /tmp/workshop-real-backend-final-review/result.json. Общая БД не изменялась. Предыдущие отметки live not run для этих сценариев устарели; negative/race/fault live-случаи не входят в новый smoke.
+
+## Close-incomplete (2026-11-02)
+
+| Сценарий | Проверка | Результат |
+|---|---|---|
+|Actions/type/terminal gate, receive forbidden, legacy/prototype closable|domain tests + real Compose receive absence|passed|
+|Reason blank/whitespace/2001 and Unicode boundary; cancel/double tap|domain/VM + Compose instrumentation|passed (6 connected tests)|
+|Strict payload, cookie POST/public schema, errors401/403/404/409/422, no route fallback|MockWebServer|passed|
+|Unknown500 → Room reopen →401/403/409/422 → identical retry; initial idempotency conflict retains slot|Room/MockWebServer|passed|
+|Worker version conflict → refresh → explicit confirmation/new key; ACK recovery|VM + Compose|passed (6 connected tests)|
+|Dispatch10/20 and zero, fixed3/10, prototype0/10 and2/10; history/remainder|real FastAPI Compose /tmp/tseh-real-close-run3/result.json|passed; independent repeat /tmp/tseh-close-root-real-review/result.json|
+|No inventory/receipt/loss/execution creation by close|real owned DB before/after each close|passed for all five cases|
+
+All real write cases use a separately archived backend and a newly owned SQLite fixture, never the shared user database. Timeout and permission faults are synthetic; they are not claimed as live-backend failure injection.

@@ -13,6 +13,8 @@ class ReceiveUseCasesTest {
         BigDecimal("10"), BigDecimal.ZERO, BigDecimal(remaining), null, null, null, sheets, if (sheets != null) 0 else null, sheets, BigDecimal("1.234"))
     private fun task(remaining: String = "10", sheets: Int? = null) = sampleTask().copy(lines = listOf(line(remaining, sheets)))
     private class Repository : TaskRepository {
+        override suspend fun closeIncompleteCapability(): Outcome<Boolean> = error("unused")
+        override suspend fun closeIncomplete(task: Task, reason: String): com.logunovinc.workshopmanager.domain.pending.CommandOutcome = error("unused")
         var received: ReceiveCommand? = null
         override suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview> = error("production not used")
         override suspend fun manufacture(task: Task, command: ManufacturingCommand, preview: ManufacturingPreview, comment: String): CommandOutcome = error("production not used")

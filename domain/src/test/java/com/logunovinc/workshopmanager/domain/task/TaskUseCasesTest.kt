@@ -9,6 +9,8 @@ import org.junit.Assert.*
 
 class TaskUseCasesTest {
     private class Repository : TaskRepository {
+        override suspend fun closeIncompleteCapability(): Outcome<Boolean> = error("unused")
+        override suspend fun closeIncomplete(task: Task, reason: String): com.logunovinc.workshopmanager.domain.pending.CommandOutcome = error("unused")
         var executions = 0
         var reads = 0
         override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long): Outcome<Page<Task>> { reads++; return Outcome.Success(Page(listOf(sampleTask()), 1, limit, offset)) }

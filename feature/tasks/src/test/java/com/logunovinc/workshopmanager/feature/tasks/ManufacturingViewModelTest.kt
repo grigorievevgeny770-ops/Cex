@@ -20,6 +20,8 @@ class ManufacturingViewModelTest {
     @Before fun before() { Dispatchers.setMain(dispatcher) }
     @After fun after() { Dispatchers.resetMain() }
     private class Tasks : TaskRepository {
+        override suspend fun closeIncompleteCapability(): Outcome<Boolean> = error("unused")
+        override suspend fun closeIncomplete(task: Task, reason: String): com.logunovinc.workshopmanager.domain.pending.CommandOutcome = error("unused")
         var current = productionTask()
         var previewCalls = 0
         var writes = 0

@@ -11,7 +11,8 @@ data class Page<T>(val items: List<T>, val total: Long, val limit: Int, val offs
     val nextOffset: Long get() = offset + items.size
     val hasMore: Boolean get() = items.isNotEmpty() && nextOffset < total
 }
-data class TaskFilter(val type: TaskType? = null)
+enum class TaskView { ACTIVE, HISTORY, ALL }
+data class TaskFilter(val type: TaskType? = null, val view: TaskView = TaskView.ACTIVE)
 data class TaskLine(
     val id: Long, val productId: Long, val productName: String, val sku: String?, val role: String,
     val baseUnit: String?, val unitName: String?, val planned: BigDecimal, val actual: BigDecimal, val remaining: BigDecimal,
@@ -32,13 +33,19 @@ data class Task(
     val sourceWarehouseId: Long?, val targetWarehouseId: Long?, val transferId: Long?, val transferVersion: Long?,
     val manufacturingOrderId: Long?, val outcome: String?, val lines: List<TaskLine>, val allowedActions: Set<String>,
     val production: ProductionDescriptor? = null,
+    val isClosedIncomplete: Boolean = false, val closedIncompleteReason: String? = null,
+    val closedIncompleteBy: Long? = null, val closedIncompleteAt: Instant? = null,
     val executions: List<Execution> = emptyList(), val history: List<HistoryEntry> = emptyList(), val discrepancies: List<Discrepancy> = emptyList(),
 ) {
     val knownWorkflow: Boolean get() = (type in setOf(TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS) || (type == TaskType.MANUFACTURE_PRODUCT && production?.supported == true && lines.count { it.role == "output" } == 1))
-    val canExecute: Boolean get() = knownWorkflow && isCompleted == false && isCancelled == false && "execute" in allowedActions
+    val canExecute: Boolean get() = !isClosedIncomplete && knownWorkflow && isCompleted == false && isCancelled == false && "execute" in allowedActions
+    val canCloseIncomplete: Boolean get() = !isClosedIncomplete && isCompleted == false && isCancelled == false &&
+        type in setOf(TaskType.DISPATCH_GOODS, TaskType.MANUFACTURE_PRODUCT) && "close_incomplete" in allowedActions
 }
 interface TaskRepository {
     suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int = 50, offset: Long = 0): Outcome<Page<Task>>
+    suspend fun closeIncompleteCapability(): Outcome<Boolean>
+    suspend fun closeIncomplete(task: Task, reason: String): CommandOutcome
     suspend fun task(id: Long): Outcome<Task>
     suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview>
     suspend fun manufacture(task: Task, command: ManufacturingCommand, preview: ManufacturingPreview, comment: String): CommandOutcome
