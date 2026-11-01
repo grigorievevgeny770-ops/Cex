@@ -1,12 +1,12 @@
 # Цех — итоговая передача
 
-Готов worker-клиент: авторизация, задания/start, приёмка, отправка, производство по норме/прототипу, история, recovery и остатки. Семь модулей, MVI/UDF, durable Room dispatcher.
+Готов worker-клиент: авторизация, задания с прямым выполнением, приёмка, отправка, производство по норме/прототипу, история, recovery и остатки. Семь модулей, MVI/UDF, durable Room dispatcher.
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 955 978 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 945 409 байт.
 
-SHA256: `cfecb7446393a228cc9317e13d93e36d30ed68fb584d2bfb2841812bd1049604`.
+SHA256: `b4d8e2c3327c481003079d71557d26e02de29136fb9ef2687eeaa614e2c5666e`.
 
 APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
 
@@ -20,11 +20,11 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 107 JVM-тест, 4 device-теста: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 110 JVM-тест, 4 device-теста: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
-- 22 synthetic production fixtures прошли jsonschema по свежей локальной OpenAPI. Это не живая приёмка серверных складских расчётов.
+- До смены lifecycle-контракта 22 production fixtures проходили jsonschema. Текущие canonical fixtures используют новые completion flags; схема-аудит ожидает новый runtime OpenAPI. Совместимость с legacy status покрыта contract-тестами.
 - Визуально проверены safe insets, скрытие клавиатуры, диалог прототипа и recovery.
 
 Матрица: TEST_MATRIX.md. Логи и evidence: STAGE_LOG.md.
@@ -60,3 +60,5 @@ Debug-prefill enabled by the user for local port8000 only. Values come from igno
 Task assignee filters removed at user request. Requests always omit assignee_user_id; the server determines the available workshop scope. Type/status filters and server pagination remain. Independent verify passed105tests/lint/build; updated APK installed and launched.
 
 Action audit is now debug-only, collapsed by default and loaded only when expanded. Assignee/actor labels and task-line identifiers are removed from task detail and execution display, including debug. Operational facts and command recovery remain available. Independent107tests/lint/APK/test-APK build passed.
+
+Manual task lifecycle removed: no TaskStatus/domain assignment/start producer, no status filters/labels/start controls. Direct execution uses server permissions and completion flags, with legacy transport compatibility. Independent110JVM tests,4device tests,lint/build/test-APK passed. The currently running local server still advertises legacy assignment restrictions; any-worker server rollout is an external integration requirement, not bypassed by the client.

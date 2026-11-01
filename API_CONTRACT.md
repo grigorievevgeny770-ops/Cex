@@ -36,3 +36,6 @@ Legacy missing descriptor/schema1 — неподдерживаемый productio
 Локальный OpenAPI:116 paths, tasks присутствует,3v2 production POST. Удалённый OpenAPI:68 paths, tasks отсутствует, v2 отсутствует.22synthetic fixtures прошли jsonschema4.26.0 Draft202012Validator по свежему снимку /tmp/workshop-openapi-v2.json; Python3.12 isolatedvenv. Живые авторизованные write-проверки настоящего backend не запускались.
 
 The mobile client no longer sends assignee_user_id (user-requested scope simplification). The backend parameter may remain supported for other clients; this app always uses the full permitted workshop scope.
+
+## Direct-execution contract transition
+The app no longer creates /start requests or sends status/assignee filters. New TaskRead completion flags is_completed/is_cancelled are supported; legacy status is optional transport compatibility only. Active queue requests use view=active plus active_only=true for the old server. Canonical manufacturing fixtures now use new flags, so current schema validation requires the corresponding updated runtime OpenAPI. The last live audit still advertises old status/start and assignment scope; no Android task restarted or deployed that backend. Historical start pending bodies are retained unchanged for safe recovery.

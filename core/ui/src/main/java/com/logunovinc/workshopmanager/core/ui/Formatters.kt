@@ -17,12 +17,3 @@ fun TaskType.title(): String = when (this) {
     TaskType.MANUFACTURE_PRODUCT -> "Изготовление"
     TaskType.UNKNOWN -> "Неизвестный тип задания"
 }
-fun TaskStatus.title(): String = when (this) {
-    TaskStatus.NEW -> "Новое"
-    TaskStatus.IN_PROGRESS -> "В работе"
-    TaskStatus.PARTIALLY_COMPLETED -> "Выполнено частично"
-    TaskStatus.WAITING_RESOLUTION -> "Ожидает решения"
-    TaskStatus.COMPLETED -> "Завершено"
-    TaskStatus.CANCELLED -> "Отменено"
-    TaskStatus.UNKNOWN -> "Неизвестный статус"
-}

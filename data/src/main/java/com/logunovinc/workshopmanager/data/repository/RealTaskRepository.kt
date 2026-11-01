@@ -70,13 +70,6 @@ class RealTaskRepository(private val remote: WorkshopRemoteDataSource, private v
                 final = command.final, reason = command.reason)).toByteArray(Charsets.UTF_8)
         }
     }
-    override suspend fun start(task: Task): CommandOutcome {
-        if (!task.canStart) return CommandOutcome.Rejected(null, AppError(ErrorKind.FORBIDDEN, "Действие недоступно"))
-        return dispatcher.submit(task.id, "start", "POST", "api/workshop/tasks/${task.id}/start",
-            CommandSummary("Взять в работу задание №${task.id}", listOf("Версия задания: ${task.version}"))) { token ->
-            json.encodeToString(StartTaskRequestDto(task.version, token)).toByteArray(Charsets.UTF_8)
-        }
-    }
     override suspend fun executions(taskId: Long, limit: Int, offset: Long) = map(remote.executions(taskId, limit, offset)) { mapper.page(it, mapper::execution) }
     override suspend fun execution(taskId: Long, executionId: Long) = map(remote.execution(taskId, executionId), mapper::execution)
     override suspend fun history(taskId: Long, limit: Int, offset: Long) = map(remote.history(taskId, limit, offset)) { mapper.page(it, mapper::history) }

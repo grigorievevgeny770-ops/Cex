@@ -36,7 +36,7 @@ class CommandDispatcher(
     /** Called only by data repositories; serializes once before the atomic durable prepare. */
     suspend fun submit(taskId: Long, action: String, method: String, path: String, summary: CommandSummary, body: (String) -> ByteArray): CommandOutcome {
         val profile = current.snapshot() ?: return unauthenticated()
-        if (taskId <= 0 || method != "POST" || !path.matches(Regex("/?api/workshop/(v2/)?tasks/$taskId/(start|executions|manufacturing-executions)")))
+        if (taskId <= 0 || method != "POST" || !path.matches(Regex("/?api/workshop/(v2/)?tasks/$taskId/(executions|manufacturing-executions)")))
             return CommandOutcome.Rejected(null, AppError(ErrorKind.VALIDATION, "Недопустимая складская команда"))
         return locks.withTask(profile.baseUrl, profile.actorId, taskId) {
             if (!current.matches(profile)) return@withTask unauthenticated()

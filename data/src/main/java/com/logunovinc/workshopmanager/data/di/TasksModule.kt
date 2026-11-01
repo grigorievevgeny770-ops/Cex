@@ -27,7 +27,6 @@ object TasksModule {
     @Provides fun resolve(repository: WarehouseRepository) = ResolveWorkshopUseCase(repository)
     @Provides fun loadTasks(repository: TaskRepository) = LoadTasksUseCase(repository)
     @Provides fun loadTask(repository: TaskRepository) = LoadTaskUseCase(repository)
-    @Provides fun start(repository: TaskRepository) = StartTaskUseCase(repository)
     @Provides fun executions(repository: TaskRepository) = LoadExecutionsUseCase(repository)
     @Provides fun history(repository: TaskRepository) = LoadHistoryUseCase(repository)
 }

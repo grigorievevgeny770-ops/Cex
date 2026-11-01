@@ -20,7 +20,6 @@ class ReceiveUseCasesTest {
         override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome { received = command; return CommandOutcome.Confirmed(CommandConfirmation("id", task.id, task.version + 1, 5001, false)) }
         override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long): Outcome<Page<Task>> = error("unused")
         override suspend fun task(id: Long): Outcome<Task> = error("unused")
-        override suspend fun start(task: Task): CommandOutcome = error("unused")
         override suspend fun executions(taskId: Long, limit: Int, offset: Long): Outcome<Page<Execution>> = error("unused")
         override suspend fun execution(taskId: Long, executionId: Long): Outcome<Execution> = error("unused")
         override suspend fun history(taskId: Long, limit: Int, offset: Long): Outcome<Page<HistoryEntry>> = error("unused")

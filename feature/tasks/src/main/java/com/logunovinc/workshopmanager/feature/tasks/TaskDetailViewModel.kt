@@ -12,36 +12,27 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-sealed interface SubmissionState {
-    data object Idle : SubmissionState
-    data object ConfirmStart : SubmissionState
-    data object Sending : SubmissionState
-    data class Confirmed(val receipt: CommandConfirmation) : SubmissionState
-    data class Unresolved(val command: PendingCommand, val error: AppError) : SubmissionState
-    data class Rejected(val error: AppError) : SubmissionState
-}
 data class TaskDetailUiState(
     val loading: Boolean = true, val task: Task? = null, val error: AppError? = null,
-    val submission: SubmissionState = SubmissionState.Idle, val staleTask: Boolean = false,
+    val lastConfirmation: CommandConfirmation? = null, val staleTask: Boolean = false,
     val pending: PendingCommand? = null,
     val executions: List<Execution> = emptyList(), val executionsLoading: Boolean = false,
     val executionsOffset: Long = 0, val executionsMore: Boolean = false, val executionsError: AppError? = null,
     val debugHistoryAvailable: Boolean = false, val debugHistoryExpanded: Boolean = false,
     val history: List<HistoryEntry> = emptyList(), val historyLoading: Boolean = false,
     val historyOffset: Long = 0, val historyMore: Boolean = false, val historyError: AppError? = null,
-)
+) {
+    val executionAvailable: Boolean get() = !loading && !staleTask && pending == null && task?.canExecute == true
+}
 sealed interface TaskDetailIntent {
     data object Refresh : TaskDetailIntent
-    data object StartClick : TaskDetailIntent
-    data object DismissConfirmation : TaskDetailIntent
-    data object ConfirmStart : TaskDetailIntent
     data object LoadMoreExecutions : TaskDetailIntent
     data object ToggleDebugHistory : TaskDetailIntent
     data object LoadMoreHistory : TaskDetailIntent
 }
 @HiltViewModel
 class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle,
-    private val loadTask: LoadTaskUseCase, private val startTask: StartTaskUseCase,
+    private val loadTask: LoadTaskUseCase,
     private val loadExecutions: LoadExecutionsUseCase, private val loadHistory: LoadHistoryUseCase,
     pending: PendingCommandRepository,
     debugOptions: TaskDebugOptions = TaskDebugOptions(),
@@ -55,20 +46,17 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
     init {
         viewModelScope.launch { pending.observe().collect { commands ->
             val current = uiState.value
-            val unresolvedId = (current.submission as? SubmissionState.Unresolved)?.command?.id ?: current.pending?.id
+            val unresolvedId = current.pending?.id
             val recovered = commands.firstOrNull { it.id == unresolvedId && it.state == PendingState.ACKNOWLEDGED }?.confirmation
             val blocked = commands.firstOrNull { it.taskId == taskId && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
-            mutableState.update { it.copy(pending = blocked, submission = recovered?.let(SubmissionState::Confirmed) ?: it.submission) }
+            mutableState.update { it.copy(pending = blocked, lastConfirmation = recovered ?: it.lastConfirmation) }
             if (recovered != null) refresh()
         } }
         refresh()
     }
     fun onIntent(intent: TaskDetailIntent) {
         when (intent) {
-            TaskDetailIntent.Refresh -> if (uiState.value.submission != SubmissionState.Sending) refresh()
-            TaskDetailIntent.StartClick -> if (uiState.value.task?.canStart == true && uiState.value.pending == null && !uiState.value.loading && !uiState.value.staleTask && uiState.value.submission !in setOf(SubmissionState.Sending, SubmissionState.ConfirmStart) && uiState.value.submission !is SubmissionState.Unresolved) mutableState.update { it.copy(submission = SubmissionState.ConfirmStart) }
-            TaskDetailIntent.DismissConfirmation -> if (uiState.value.submission == SubmissionState.ConfirmStart) mutableState.update { it.copy(submission = SubmissionState.Idle) }
-            TaskDetailIntent.ConfirmStart -> confirmStart()
+            TaskDetailIntent.Refresh -> refresh()
             TaskDetailIntent.LoadMoreExecutions -> executions(reset = false)
             TaskDetailIntent.ToggleDebugHistory -> toggleDebugHistory()
             TaskDetailIntent.LoadMoreHistory -> history(reset = false)
@@ -89,20 +77,6 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
                     history(reset = true)
                 }
             }
-        }
-    }
-    private fun confirmStart() {
-        if (uiState.value.pending != null || uiState.value.submission != SubmissionState.ConfirmStart || uiState.value.loading || uiState.value.staleTask || uiState.value.task?.canStart != true) return
-        val task = uiState.value.task ?: return
-        mutableState.update { it.copy(submission = SubmissionState.Sending) }
-        viewModelScope.launch {
-            val result = startTask(task)
-            mutableState.update { it.copy(submission = when (result) {
-                is CommandOutcome.Confirmed -> SubmissionState.Confirmed(result.confirmation)
-                is CommandOutcome.Unresolved -> SubmissionState.Unresolved(result.command, result.error)
-                is CommandOutcome.Rejected -> SubmissionState.Rejected(result.error)
-            }, staleTask = result is CommandOutcome.Confirmed || result is CommandOutcome.Rejected) }
-            if (result !is CommandOutcome.Unresolved) refresh()
         }
     }
     private fun executions(reset: Boolean) {

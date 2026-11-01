@@ -43,7 +43,7 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
             }
             state.pending?.let { pending -> Text("Есть сохранённый запрос: ${pending.summary.title}"); pending.summary.lines.forEach { Text(it) }; TextButton(onClick = onRecoveryClick) { Text("Открыть журнал запросов") } }
             if (task != null && !task.canExecute) Text("Выполнение сейчас недоступно. Обновите карточку или откройте историю")
-            if (task?.status == TaskStatus.COMPLETED && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
+            if (task?.isCompleted == true && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
         }
         items(task?.lines.orEmpty(), key = TaskLine::id) { line ->
             val input = state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id)

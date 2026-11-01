@@ -209,4 +209,25 @@ class CommandDispatcherTest {
         val repository = RealPendingCommandRepository(room, mapper, session, dispatcher)
         assertEquals(PendingState.UNKNOWN, repository.observe().first().single().state)
     }
+    @Test fun newStartIsRejectedButAnExistingHistoricalStartRetriesItsExactBody() = runBlocking {
+        val bodies = mutableListOf<ByteArray>()
+        val dispatcher = dispatcher(sender { command ->
+            assertEquals("api/workshop/tasks/101/start", command.path)
+            bodies += command.body.copyOf()
+            RawCommandResponse(200, "application/json", ack)
+        })
+        val rejected = dispatcher.submit(101, "start", "POST", "api/workshop/tasks/101/start", summary) { token ->
+            """{"expected_version":3,"client_token":"$token"}""".toByteArray()
+        }
+        assertTrue(rejected is CommandOutcome.Rejected)
+        assertTrue(bodies.isEmpty())
+        val exact = """{"expected_version":3,"client_token":"historical-token","comment":""}""".toByteArray()
+        val saved = PendingCommandEntity("historical-start", "https://example.com/", 42, 101, "start", "historical-token", "POST",
+            "api/workshop/tasks/101/start", exact, "historical-fingerprint", mapper.summary(summary), 1, PendingState.UNKNOWN.name, uncertain = true)
+        room.prepare(saved)
+        assertTrue(dispatcher.retry(saved.id) is CommandOutcome.Confirmed)
+        assertArrayEquals(exact, bodies.single())
+        assertArrayEquals(exact, room.get(saved.id)!!.body)
+    }
+
 }

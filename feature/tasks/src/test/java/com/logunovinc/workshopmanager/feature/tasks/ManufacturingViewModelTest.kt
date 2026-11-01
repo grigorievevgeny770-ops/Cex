@@ -37,7 +37,6 @@ class ManufacturingViewModelTest {
         override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome = error("unused")
         override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome = error("unused")
         override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long): Outcome<Page<Task>> = error("unused")
-        override suspend fun start(task: Task): CommandOutcome = error("unused")
         override suspend fun executions(taskId: Long, limit: Int, offset: Long): Outcome<Page<Execution>> = error("unused")
         override suspend fun execution(taskId: Long, executionId: Long): Outcome<Execution> = error("unused")
         override suspend fun history(taskId: Long, limit: Int, offset: Long): Outcome<Page<HistoryEntry>> = error("unused")

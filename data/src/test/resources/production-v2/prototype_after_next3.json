@@ -1,13 +1,10 @@
 {
   "id": 101,
   "type": "MANUFACTURE_PRODUCT",
-  "status": "in_progress",
   "version": 4,
   "warehouse_id": 42,
-  "assignee_user_id": 42,
   "created_by": 1,
   "created_at": "2026-11-01T12:00:00Z",
-  "started_at": "2026-11-01T12:01:00Z",
   "completed_at": null,
   "due_at": null,
   "comment": "Synthetic planned v2 fixture",
@@ -75,5 +72,7 @@
         "unit_qty": "4"
       }
     ]
-  }
+  },
+  "is_completed": false,
+  "is_cancelled": false
 }

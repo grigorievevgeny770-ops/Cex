@@ -9,7 +9,9 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class PageDto<T>(val items: List<T>, val total: Long, val limit: Int, val offset: Long)
 @Serializable data class WarehouseDto(val id: Long, val name: String, val code: String? = null, @SerialName("is_active") val active: Boolean)
 @Serializable data class TaskDto(
-    val id: Long, val type: String, val status: String, val version: Long,
+    val id: Long, val type: String, val status: String? = null, val version: Long,
+    @SerialName("is_completed") val isCompleted: Boolean? = null,
+    @SerialName("is_cancelled") val isCancelled: Boolean? = null,
     @SerialName("warehouse_id") val warehouseId: Long,
     @SerialName("assignee_user_id") val assigneeId: Long? = null,
     @SerialName("created_by") val createdBy: Long,
@@ -70,6 +72,4 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class DiscrepancyDto(val id: Long, val status: String,
     @SerialName("missing_qty") val missing: BigDecimal,
     @SerialName("unresolved_qty") val unresolved: BigDecimal, val reason: String)
-@Serializable data class StartTaskRequestDto(@SerialName("expected_version") val expectedVersion: Long,
-    @SerialName("client_token") val clientToken: String, val comment: String = "")
 @Serializable data class TaskResponseDto(val result: CommandResultDto, val task: TaskDto)

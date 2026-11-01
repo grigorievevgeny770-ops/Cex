@@ -8,7 +8,7 @@ import com.logunovinc.workshopmanager.domain.pending.*
 import com.logunovinc.workshopmanager.domain.warehouse.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import okhttp3.mockwebserver.*
 import org.junit.*
 import org.junit.Assert.*
@@ -23,7 +23,8 @@ class TasksContractTest {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val mapper = TaskMapper()
     private fun reply(body: String, status: Int = 200) = MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json").setBody(body)
-    private fun task(id: Long = 101, type: String = "RECEIVE_GOODS", status: String = "new", version: Long = 3, assigneeId: Long? = null): String = """{"id":$id,"type":"$type","status":"$status","version":$version,"warehouse_id":42,"assignee_user_id":${assigneeId?.toString() ?: "null"},"created_by":1,"created_at":"2026-11-01T15:00:00+03:00","due_at":null,"comment":"test","allowed_actions":["start","execute"],"lines":[{"id":1001,"product_id":301,"product_name":"Материал","role":"receive","base_unit":"шт","planned_qty":"10.0000","actual_qty":"0","remaining_qty":"10.0000","planned_sheets":9,"actual_sheets":0,"remaining_sheets":9,"sheet_length_m":"1.234"}]}"""
+    private fun task(id: Long = 101, type: String = "RECEIVE_GOODS", status: String? = null, version: Long = 3,
+        flags: Boolean = true, completed: Boolean = false, cancelled: Boolean = false): String = """{"id":$id,"type":"$type","version":$version${if (flags) ",\"is_completed\":$completed,\"is_cancelled\":$cancelled" else ""}${status?.let { ",\"status\":\"$it\"" }.orEmpty()},"warehouse_id":42,"created_by":1,"created_at":"2026-11-01T15:00:00+03:00","due_at":null,"comment":"test","allowed_actions":["execute"],"lines":[{"id":1001,"product_id":301,"product_name":"Материал","role":"receive","base_unit":"шт","planned_qty":"10.0000","actual_qty":"0","remaining_qty":"10.0000","planned_sheets":9,"actual_sheets":0,"remaining_sheets":9,"sheet_length_m":"1.234"}]}"""
     class MemoryJournal : CommandJournal {
         val commands = mutableMapOf<String, PendingCommandEntity>()
         override suspend fun prepare(command: PendingCommandEntity): PrepareResult { commands[command.id] = command; return PrepareResult.Created(command) }
@@ -55,34 +56,33 @@ class TasksContractTest {
         assertEquals("true", server.takeRequest().requestUrl?.queryParameter("include_inactive"))
     }
     @Test fun scopeFiltersAndPaginationAreServerQueries() = runBlocking {
-        server.enqueue(reply("""{"items":[${task(assigneeId = 42)},${task(id = 102)}],"total":61,"limit":50,"offset":0}"""))
+        server.enqueue(reply("""{"items":[${task()},${task(id = 102)}],"total":61,"limit":50,"offset":0}"""))
         val page = repository.tasks(42, TaskFilter(), 50, 0) as Outcome.Success
         assertTrue(page.value.hasMore)
-        assertEquals(listOf(42L, null), page.value.items.map(Task::assigneeId))
+        assertEquals(listOf(101L, 102L), page.value.items.map(Task::id))
         val default = server.takeRequest().requestUrl!!
         assertEquals("42", default.queryParameter("warehouse_id"))
         assertNull(default.queryParameter("assignee_user_id"))
         assertEquals("true", default.queryParameter("active_only"))
         for (type in listOf(TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS, TaskType.MANUFACTURE_PRODUCT)) {
-            for (completed in listOf(false, true)) {
-                server.enqueue(reply("""{"items":[],"total":61,"limit":50,"offset":50}"""))
-                repository.tasks(42, TaskFilter(type = type, completed = completed), 50, 50)
-                val filtered = server.takeRequest().requestUrl!!
-                assertNull(filtered.queryParameter("assignee_user_id"))
-                assertEquals("42", filtered.queryParameter("warehouse_id"))
-                assertEquals(type.name, filtered.queryParameter("type"))
-                assertEquals(if (completed) "completed" else null, filtered.queryParameter("status"))
-                assertEquals((!completed).toString(), filtered.queryParameter("active_only"))
-                assertEquals("50", filtered.queryParameter("offset"))
-            }
+            server.enqueue(reply("""{"items":[],"total":61,"limit":50,"offset":50}"""))
+            repository.tasks(42, TaskFilter(type = type), 50, 50)
+            val filtered = server.takeRequest().requestUrl!!
+            assertNull(filtered.queryParameter("assignee_user_id"))
+            assertNull(filtered.queryParameter("status"))
+            assertEquals("active", filtered.queryParameter("view"))
+            assertEquals("42", filtered.queryParameter("warehouse_id"))
+            assertEquals(type.name, filtered.queryParameter("type"))
+            assertEquals("true", filtered.queryParameter("active_only"))
+            assertEquals("50", filtered.queryParameter("offset"))
         }
     }
     @Test fun unsupportedEnumsAndNullDatesDoNotGuessMutations() = runBlocking {
-        server.enqueue(reply(task(type = "FUTURE", status = "future_status")))
+        server.enqueue(reply(task(type = "FUTURE", status = "future_status", flags = false)))
         val value = (repository.task(101) as Outcome.Success).value
         assertEquals(TaskType.UNKNOWN, value.type)
-        assertEquals(TaskStatus.UNKNOWN, value.status)
-        assertFalse(value.canStart)
+        assertNull(value.isCompleted)
+        assertNull(value.isCancelled)
         assertFalse(value.canExecute)
         assertNull(value.dueAt)
         assertEquals(Instant.parse("2026-11-01T12:00:00Z"), value.createdAt)
@@ -104,34 +104,54 @@ class TasksContractTest {
         server.enqueue(reply("""{"code":"FORBIDDEN","message":"No warehouse permission"}""", 403))
         assertEquals(ErrorKind.FORBIDDEN, (warehouses.warehouses() as Outcome.Failure).error.kind)
     }
-    @Test fun startUsesOnlyVersionAndTokenAndReadsTaskVersionFromAck() = runBlocking {
-        server.enqueue(reply(task()))
+    @Test fun directExecutionUsesCurrentVersionAndAcknowledgedTaskVersionWithoutStart() = runBlocking {
+        server.enqueue(reply(task(type = "DISPATCH_GOODS")))
         val initial = (repository.task(101) as Outcome.Success).value
         server.takeRequest()
-        server.enqueue(reply("""{"result":{"id":101,"version":1,"duplicate":true},"task":${task(status = "in_progress", version = 9)}}"""))
-        val result = repository.start(initial) as CommandOutcome.Confirmed
+        server.enqueue(reply("""{"result":{"id":101,"version":1,"duplicate":true},"task":${task(type = "DISPATCH_GOODS", version = 9)}}"""))
+        val result = ExecuteDispatchUseCase(repository)(initial, DispatchDraft(listOf(ActualLineInput(1001, sheets = "3")))) as CommandOutcome.Confirmed
         val request = server.takeRequest()
-        assertEquals("/api/workshop/tasks/101/start", request.path)
-        val body = json.parseToJsonElement(request.body.readUtf8()).toString()
-        assertTrue(body.contains("expected_version"))
-        assertFalse(body.contains("expected_transfer_version"))
-        assertFalse(body.contains("lines"))
+        assertEquals("/api/workshop/tasks/101/executions", request.path)
+        val body = json.parseToJsonElement(request.body.readUtf8()).jsonObject
+        assertEquals("3", body["expected_version"]!!.jsonPrimitive.content)
+        assertFalse(body.containsKey("expected_transfer_version"))
         assertEquals(9L, result.confirmation.taskVersion)
         assertEquals(1, journal.commands.size)
-        assertTrue(journal.commands.values.single().ackBody.orEmpty().contains("in_progress"))
     }
-    @Test fun staleVersionAndRightsConflictAreTypedWithoutFallbackEndpoint() = runBlocking {
-        server.enqueue(reply(task()))
+    @Test fun executionConflictAndRightsRevocationDoNotCallAnotherEndpoint() = runBlocking {
+        server.enqueue(reply(task(type = "DISPATCH_GOODS")))
         val initial = (repository.task(101) as Outcome.Success).value
         server.takeRequest()
-        server.enqueue(reply("""{"code":"VERSION_CONFLICT","message":"Изменено другим работником"}""", 409))
-        val result = repository.start(initial) as CommandOutcome.Rejected
+        server.enqueue(reply("""{"code":"VERSION_CONFLICT","message":"Изменено другим сотрудником"}""", 409))
+        val result = ExecuteDispatchUseCase(repository)(initial, DispatchDraft(listOf(ActualLineInput(1001, sheets = "3")))) as CommandOutcome.Rejected
         assertEquals(ErrorKind.CONFLICT, result.error.kind)
         assertEquals("VERSION_CONFLICT", result.error.code)
-        assertEquals("/api/workshop/tasks/101/start", server.takeRequest().path)
-        server.enqueue(reply("""{"code":"FORBIDDEN","message":"Задание назначено другому"}""", 403))
-        assertEquals(ErrorKind.FORBIDDEN, (repository.start(initial) as CommandOutcome.Rejected).error.kind)
-        assertEquals("/api/workshop/tasks/101/start", server.takeRequest().path)
+        assertEquals("/api/workshop/tasks/101/executions", server.takeRequest().path)
+        server.enqueue(reply("""{"code":"ACCESS_DENIED","message":"Нет разрешения на выполнение"}""", 403))
+        val denied = ExecuteDispatchUseCase(repository)(initial, DispatchDraft(listOf(ActualLineInput(1001, sheets = "3")))) as CommandOutcome.Rejected
+        assertEquals(ErrorKind.FORBIDDEN, denied.error.kind)
+        assertEquals("/api/workshop/tasks/101/executions", server.takeRequest().path)
+    }
+    @Test fun completionFlagsPreferNewContractAndLegacyFallbackFailsClosedWhenUnknown() = runBlocking {
+        for ((legacy, expected) in listOf("new" to (false to false), "in_progress" to (false to false), "partially_completed" to (false to false), "waiting_resolution" to (false to false), "completed" to (true to false), "cancelled" to (false to true), "future" to (null to null))) {
+            server.enqueue(reply(task(status = legacy, flags = false)))
+            val value = (repository.task(101) as Outcome.Success).value
+            server.takeRequest()
+            assertEquals(expected, value.isCompleted to value.isCancelled)
+            assertEquals(expected == (false to false), value.canExecute)
+        }
+        server.enqueue(reply(task(status = "future")))
+        val preferred = (repository.task(101) as Outcome.Success).value
+        server.takeRequest()
+        assertTrue(preferred.canExecute)
+        server.enqueue(reply(task().replace(",\"is_cancelled\":false", "")))
+        val incomplete = (repository.task(101) as Outcome.Success).value
+        server.takeRequest()
+        assertFalse(incomplete.canExecute)
+        server.enqueue(reply(task(flags = false)))
+        assertFalse((repository.task(101) as Outcome.Success).value.canExecute)
+        server.takeRequest()
+        Unit
     }
     @Test fun historyAndExecutionsReadBeyondEmbeddedFiftySeparately() = runBlocking {
         val execution = """{"id":5001,"task_id":101,"executed_by":42,"executed_at":"2026-11-01T12:00:00Z","final":false,"lines":[{"task_line_id":1001,"product_id":301,"role":"receive","actual_qty":"4"}]}"""

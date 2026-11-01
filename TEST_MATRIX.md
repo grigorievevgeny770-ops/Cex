@@ -8,7 +8,7 @@
 |2|No password persistence/logged cookies, actor/server isolation|data + review|Tests + статическое ревью: passed|
 |3|Workshop42 после main7, missing/inactive/403|domain/data|Unit/MockWebServer/VM: passed|
 |4|Task scope/paging/filter race/unknown enums|data/VM|Unit/MockWebServer/VM: passed|
-|5|Start, worker race, stale version, permissions|data/VM|Unit/MockWebServer/VM: passed|
+|5|Direct execution, no new start, stale version, permissions|data/VM|Unit/MockWebServer/VM: passed|
 |6|Receive full/partial/multiple step delta|domain/data|Unit/MWS/VM + Compose partial receive: passed|
 |7|Receive10→4→5 final shortage1 без loss approval|data/VM|Unit/MockWebServer/VM: passed|
 |8|Zero final/reason, partial, excess/foreign line|domain/data|Unit/MockWebServer/VM: passed|

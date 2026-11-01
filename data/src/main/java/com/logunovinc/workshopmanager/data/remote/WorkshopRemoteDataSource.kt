@@ -13,7 +13,7 @@ class WorkshopRemoteDataSource(private val factory: ApiFactory, private val curr
     suspend fun manufacturingPreview(id: Long, request: PrototypePreviewDto) = calls.request(ProductionApi::class.java, missingRoute = true) { api, _ -> api.prototypePreview(id, request) }
     suspend fun warehouses() = request(missingRoute = true) { api, _ -> api.warehouses() }
     suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long) = request(missingRoute = true) { api, _ ->
-        api.tasks(warehouseId, !filter.completed, filter.type?.name, if (filter.completed) "completed" else null,
+        api.tasks(warehouseId, filter.type?.name,
             limit, offset)
     }
     suspend fun task(id: Long) = request { api, _ -> api.task(id) }

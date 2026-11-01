@@ -40,11 +40,6 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
             TextButton(onClick = onRecoveryClick) { Text("Журнал запросов") }
         }
         state.warehouse?.let { Text(it.name, style = MaterialTheme.typography.bodySmall) }
-        Row {
-            FilterChip(selected = !state.filter.completed, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(completed = false))) }, label = { Text("Текущие") })
-            Spacer(Modifier.width(8.dp))
-            FilterChip(selected = state.filter.completed, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(completed = true))) }, label = { Text("Завершённые") })
-        }
         var menu by remember { mutableStateOf(false) }
         Box {
             OutlinedButton(onClick = { menu = true }) { Text(state.filter.type?.title() ?: "Все типы") }
@@ -63,9 +58,6 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
                     Card(Modifier.fillMaxWidth().clickable { onTaskClick(task.id) }) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("№${task.id} · ${task.type.title()}", style = MaterialTheme.typography.titleMedium)
-                            Text(task.status.title())
-                            if (task.assigneeId == null && task.canStart) Text("Можно взять в работу", color = MaterialTheme.colorScheme.primary)
-                            else Text(task.assigneeId?.let { "Исполнитель №$it" } ?: "Не назначено")
                             task.lines.take(3).forEach { line ->
                                 Text(line.productName)
                                 Text("План ${QuantityFormatter.format(line.planned)} · факт ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}", style = MaterialTheme.typography.bodySmall)

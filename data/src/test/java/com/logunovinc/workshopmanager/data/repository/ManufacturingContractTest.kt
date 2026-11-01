@@ -109,7 +109,6 @@ class ManufacturingContractTest {
     @Test fun legacyMissingOrUnknownDescriptorNeverCallsNewRoutesOrManualV1() = runBlocking {
         for (fixture in listOf("legacy_task", "legacy_descriptor_task", "unknown_mode_task")) {
             val task = h.task(fixture)
-            assertFalse(task.canStart)
             assertFalse(task.canExecute)
             assertTrue(PrepareManufacturingUseCase()(task, ManufacturingDraft(ActualLineInput(3002, "3"))) is Outcome.Failure)
         }

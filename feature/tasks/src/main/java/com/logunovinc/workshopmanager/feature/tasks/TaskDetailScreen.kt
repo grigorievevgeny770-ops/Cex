@@ -35,41 +35,28 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(task?.let { "Задание №${it.id}" } ?: "Задание", style = MaterialTheme.typography.headlineSmall)
-                TextButton(onClick = { onIntent(TaskDetailIntent.Refresh) }, enabled = state.submission != SubmissionState.Sending) { Text("Обновить") }
+                TextButton(onClick = { onIntent(TaskDetailIntent.Refresh) }) { Text("Обновить") }
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
-            when (val submission = state.submission) {
-                is SubmissionState.Confirmed -> Text("Подтверждено сервером · версия ${submission.receipt.taskVersion}", color = MaterialTheme.colorScheme.primary)
-                is SubmissionState.Unresolved -> {
-                    Text("Исход запроса неизвестен: ${submission.error.message}", color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = onRecoveryClick) { Text("Восстановить исходный запрос") }
-                }
-                is SubmissionState.Rejected -> Text(submission.error.message, color = MaterialTheme.colorScheme.error)
-                SubmissionState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                else -> Unit
-            }
+            state.lastConfirmation?.let { Text("Подтверждено сервером · версия ${it.taskVersion}", color = MaterialTheme.colorScheme.primary) }
             state.pending?.let { pending -> Text("Сохранённый запрос: ${pending.summary.title}"); TextButton(onClick = onRecoveryClick) { Text("Открыть журнал запросов") } }
             if (state.staleTask) Text("Для следующих действий нужно получить актуальную карточку")
         }
         if (task != null) {
             item {
                 Text(task.type.title(), style = MaterialTheme.typography.titleLarge)
-                Text(task.status.title())
                 Text("Создано ${localDate(task.createdAt)} · срок ${localDate(task.dueAt)}")
-                task.startedAt?.let { Text("Начато ${localDate(it)}") }
-                task.completedAt?.let { Text("Завершено ${localDate(it)}") }
                 if (task.comment.isNotBlank()) Text(task.comment)
-                if (task.status == TaskStatus.COMPLETED && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
+                if (task.isCompleted == true && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
                 if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported != true) Text("Производственный режим требует серверной нормы v2. Старое ручное списание не поддерживается; обратитесь к менеджеру")
-                if (task.type == TaskType.UNKNOWN || task.status == TaskStatus.UNKNOWN) Text("Неподдерживаемый тип или статус сервера. Изменения недоступны")
+                if (task.type == TaskType.UNKNOWN || task.isCompleted == null || task.isCancelled == null) Text("Сервер не разрешает выполнение этого задания")
                 if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported == true) task.production?.let {
                     if (it.status == com.logunovinc.workshopmanager.domain.production.RecipeStatus.AWAITING_PROTOTYPE) Text("Требуется первый прототип; норма ещё не задана") else RecipeSummary(it)
                 }
-                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, modifier = Modifier.testTag("task-manufacturing"), enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Изготовить изделие") }
-                if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Отправить товары") }
-                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, modifier = Modifier.testTag("task-receive"), enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Принять товары") }
-                if (task.canStart) Button(onClick = { onIntent(TaskDetailIntent.StartClick) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Взять в работу") }
+                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, modifier = Modifier.testTag("task-manufacturing"), enabled = state.executionAvailable) { Text("Изготовить изделие") }
+                if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.executionAvailable) { Text("Отправить товары") }
+                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, modifier = Modifier.testTag("task-receive"), enabled = state.executionAvailable) { Text("Принять товары") }
             }
             items(task.lines, key = { "line-${it.id}" }) { line -> TaskLineCard(line) }
             items(task.discrepancies, key = { "difference-${it.id}" }) { discrepancy ->
@@ -109,11 +96,7 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
             }
         }
     }
-    if (state.submission == SubmissionState.ConfirmStart && task != null) AlertDialog(
-        onDismissRequest = { onIntent(TaskDetailIntent.DismissConfirmation) }, title = { Text("Взять задание №${task.id}?") },
-        text = { Text("Задание будет закреплено за вами. Сервер проверит доступность и версию ${task.version}") },
-        confirmButton = { Button(onClick = { onIntent(TaskDetailIntent.ConfirmStart) }, enabled = !state.loading && !state.staleTask) { Text("Подтвердить") } },
-        dismissButton = { TextButton(onClick = { onIntent(TaskDetailIntent.DismissConfirmation) }) { Text("Назад") } })
+
 }
 @Composable
 private fun TaskLineCard(line: TaskLine) {

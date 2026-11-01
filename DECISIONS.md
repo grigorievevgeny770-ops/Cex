@@ -30,3 +30,6 @@
 - User simplified task scope: no own/queue or assigned-to-me selector. Always omit assignee_user_id, request all workshop tasks allowed to the actor by the server. Type/status filters remain.
 
 - User simplified execution details: action audit is debug-only and collapsed by default, fetched on explicit expansion. Assignee/actor labels and task-line IDs are omitted even in debug. Server payload identifiers remain intact; operational facts and durable command recovery are not debug-only.
+
+- User removed manual task lifecycle: direct physical execution, no claim/start/status filters or labels. Completion/cancellation flags and server allowed_actions remain internal safety facts, not user-managed statuses. Legacy status support exists only in data mapping during backend rollout; new task-state commands cannot be created.
+- External integration requirement: running local backend still exposes legacy assignment scope while its source is being updated elsewhere. Any-worker access requires the updated server rollout; Android changes do not bypass warehouse permissions or modify/deploy backend.

@@ -6,9 +6,9 @@ import retrofit2.http.*
 
 interface WorkshopApi {
     @GET("api/warehouses") suspend fun warehouses(@Query("include_inactive") includeInactive: Boolean = true): Response<List<WarehouseDto>>
-    @GET("api/workshop/tasks") suspend fun tasks(
-        @Query("warehouse_id") warehouseId: Long, @Query("active_only") active: Boolean,
-        @Query("type") type: String?, @Query("status") status: String?,
+    @GET("api/workshop/tasks?view=active&active_only=true") suspend fun tasks(
+        @Query("warehouse_id") warehouseId: Long,
+        @Query("type") type: String?,
         @Query("limit") limit: Int, @Query("offset") offset: Long,
     ): Response<PageDto<TaskDto>>
     @GET("api/workshop/tasks/{id}") suspend fun task(@Path("id") id: Long): Response<TaskDto>
