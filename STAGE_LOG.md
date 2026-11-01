@@ -60,3 +60,8 @@ Read-only audit: локальный OpenAPI теперь116paths/3productionv2PO
 - UI fixes до приёмки: safe insets, IME скрывается перед preview/confirm, стабильный screenshot диалога. Espresso3.7.0 закреплён для API37; StrictMode не отключался. PNG: /tmp/tseh-connected-screenshots/connected-screenshots/ и /tmp/workshop-final-process-review/.
 - Финальная assembleDebug SUCCESSFUL: /tmp/workshop-final-apk-build.log. APK14954598bytes, SHA2561b13b4addf4712357356a7666cd9033bcff1eb587b642815af346db00b8fd199. Normal debug установлен/запущен Statusok; UI подтверждает http://10.0.2.2:8000/.
 - Настоящие backend writes/login/worker ACL/production stock integration не запускались. Local v2 доступен, remote workshop API отсутствует. Нет push/deploy/изменений серверной БД.
+
+## Follow-up — local debug login prefill
+- User requested local default login/password fields. Values added only to ignored local.properties; debug BuildConfig consumes them, release/processFixture empty. No auto-login, remote/other-port fields empty, environment switch clears fields, submitted passwords still clear.
+- Independent ./scripts/verify.sh SUCCESSFUL105tests; :app:assembleDebugAndroidTest SUCCESSFUL. Logs /tmp/workshop-prefill-review.log and /tmp/workshop-prefill-test-apk-review.log. No actual login POST.
+- APK installed/relaunched; UI automation confirms requested login visible and masked password populated. APK14954598bytes SHA256c6b7664eb2572b534d23e938ce0bb2eed105b831bb54c27cc1099e1d28aeae0c.

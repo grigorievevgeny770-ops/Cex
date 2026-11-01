@@ -3,6 +3,7 @@ package com.logunovinc.workshopmanager.testing
 import android.content.Context
 import androidx.room.Room
 import com.logunovinc.workshopmanager.di.ApplicationModule
+import com.logunovinc.workshopmanager.feature.auth.AuthPrefill
 import com.logunovinc.workshopmanager.data.di.PersistenceModule
 import com.logunovinc.workshopmanager.data.local.*
 import com.logunovinc.workshopmanager.data.local.pending.*
@@ -36,6 +37,7 @@ object ConnectedTestModule {
     @Provides @Singleton fun realAuth(settings: EnvironmentSettings, factory: ApiFactory, errors: ApiErrorMapper) = RealAuthRepository(settings, factory, errors, true, FixtureRuntime.backend.baseUrl)
     @Provides @Singleton fun auth(repository: RealAuthRepository): AuthRepository = repository
     @Provides @Singleton fun current(repository: RealAuthRepository): CurrentSession = repository
+    @Provides fun authPrefill() = AuthPrefill()
     @Provides fun login(repository: AuthRepository) = LoginUseCase(repository)
     @Provides fun restore(repository: AuthRepository) = RestoreSessionUseCase(repository)
     @Provides fun logout(repository: AuthRepository) = LogoutUseCase(repository)

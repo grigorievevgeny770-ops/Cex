@@ -6,7 +6,7 @@
 
 `app/build/outputs/apk/debug/app-debug.apk` — 14 954 598 байт.
 
-SHA256: `1b13b4addf4712357356a7666cd9033bcff1eb587b642815af346db00b8fd199`.
+SHA256: `c6b7664eb2572b534d23e938ce0bb2eed105b831bb54c27cc1099e1d28aeae0c`.
 
 APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
 
@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 101 JVM-тест, 4 device-теста: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 105 JVM-тест, 4 device-теста: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -54,3 +54,5 @@ Connected tests запускать на выделенном эмуляторе:
 | Финальный HEAD (`git log -1`) | Device/E2E/process recovery/UI fixes/передача |
 
 Push, публикация APK и server deployment не выполнялись.
+
+Debug-prefill enabled by the user for local port8000 only. Values come from ignored local.properties and are included in ordinary debug APK only; no auto-login. Release/processFixture defaults stay empty. Prefill regression tests and test-APK compilation passed; emulator fields verified without submitting login.
