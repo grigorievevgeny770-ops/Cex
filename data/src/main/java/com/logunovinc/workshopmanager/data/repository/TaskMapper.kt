@@ -14,7 +14,7 @@ class TaskMapper {
         value.version, value.warehouseId, value.assigneeId, value.createdBy, instant(value.createdAt),
         value.startedAt?.let(::instant), value.completedAt?.let(::instant), value.dueAt?.let(::instant), value.comment,
         value.sourceWarehouseId, value.targetWarehouseId, value.transferId, value.transferVersion, value.manufacturingOrderId, value.outcome,
-        value.lines.map(::line), value.allowedActions.toSet(), value.executions.map(::execution), value.history.map(::history),
+        value.lines.map(::line), value.allowedActions.toSet(), value.production?.let { ProductionMapper().descriptor(it) }, value.executions.map(::execution), value.history.map(::history),
         value.discrepancies.map { Discrepancy(it.id, it.status, it.missing, it.unresolved, it.reason) })
     private fun line(value: TaskLineDto) = TaskLine(value.id, value.productId, value.productName, value.sku, value.role,
         value.baseUnit, value.unitName, value.planned, value.actual, value.remaining, value.plannedUnit, value.actualUnit, value.remainingUnit,

@@ -1,0 +1,51 @@
+{
+  "task_id": 101,
+  "task_version": 3,
+  "recipe_version": 1,
+  "mode": "by_recipe",
+  "output": {
+    "task_line_id": 3002,
+    "product_id": 501,
+    "product_name": "Изделие",
+    "base_unit": "шт",
+    "qty": "3",
+    "sheets": null,
+    "sheet_length_m": null,
+    "unit_name": "шт",
+    "unit_qty": "3"
+  },
+  "materials": [
+    {
+      "product_id": 301,
+      "product_name": "Материал",
+      "sku": "MAT-301",
+      "base_unit": "шт",
+      "qty": "6",
+      "sheets": null,
+      "sheet_length_m": null,
+      "unit_name": "шт",
+      "unit_qty": "6",
+      "stock_qty": "3",
+      "reserved_qty": "1",
+      "free_qty": "2",
+      "stock_sheets": null,
+      "reserved_sheets": null,
+      "free_sheets": null,
+      "missing_qty": "4",
+      "missing_sheets": null,
+      "dimension_availability": "not_applicable"
+    }
+  ],
+  "can_execute": false,
+  "issues": [
+    {
+      "code": "INSUFFICIENT_STOCK",
+      "message": "Не хватает 4 единиц материала",
+      "product_id": 301,
+      "task_line_id": null,
+      "material_index": 0,
+      "details": null
+    }
+  ],
+  "proposed_recipe": null
+}

@@ -3,6 +3,7 @@ package com.logunovinc.workshopmanager.domain.task
 import java.math.BigDecimal
 import java.time.Instant
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.production.*
 import com.logunovinc.workshopmanager.domain.pending.CommandOutcome
 
 enum class TaskType { RECEIVE_GOODS, DISPATCH_GOODS, MANUFACTURE_PRODUCT, UNKNOWN }
@@ -31,15 +32,18 @@ data class Task(
     val startedAt: Instant?, val completedAt: Instant?, val dueAt: Instant?, val comment: String,
     val sourceWarehouseId: Long?, val targetWarehouseId: Long?, val transferId: Long?, val transferVersion: Long?,
     val manufacturingOrderId: Long?, val outcome: String?, val lines: List<TaskLine>, val allowedActions: Set<String>,
+    val production: ProductionDescriptor? = null,
     val executions: List<Execution> = emptyList(), val history: List<HistoryEntry> = emptyList(), val discrepancies: List<Discrepancy> = emptyList(),
 ) {
-    val knownWorkflow: Boolean get() = type in setOf(TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS) && status != TaskStatus.UNKNOWN
+    val knownWorkflow: Boolean get() = (type in setOf(TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS) || (type == TaskType.MANUFACTURE_PRODUCT && production?.supported == true && lines.count { it.role == "output" } == 1)) && status != TaskStatus.UNKNOWN
     val canStart: Boolean get() = knownWorkflow && status !in setOf(TaskStatus.COMPLETED, TaskStatus.CANCELLED) && "start" in allowedActions
     val canExecute: Boolean get() = knownWorkflow && status !in setOf(TaskStatus.COMPLETED, TaskStatus.CANCELLED) && "execute" in allowedActions
 }
 interface TaskRepository {
     suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int = 50, offset: Long = 0): Outcome<Page<Task>>
     suspend fun task(id: Long): Outcome<Task>
+    suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview>
+    suspend fun manufacture(task: Task, command: ManufacturingCommand, preview: ManufacturingPreview, comment: String): CommandOutcome
     suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome
     suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome
     suspend fun start(task: Task): CommandOutcome

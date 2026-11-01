@@ -1,0 +1,51 @@
+{
+  "task_id": 101,
+  "task_version": 3,
+  "recipe_version": 1,
+  "mode": "by_recipe",
+  "output": {
+    "task_line_id": 3002,
+    "product_id": 501,
+    "product_name": "Изделие",
+    "base_unit": "м²",
+    "qty": "0",
+    "sheets": 3,
+    "sheet_length_m": "0.001",
+    "unit_name": null,
+    "unit_qty": null
+  },
+  "materials": [
+    {
+      "product_id": 301,
+      "product_name": "Материал",
+      "sku": "MAT-301",
+      "base_unit": "м²",
+      "qty": "0",
+      "sheets": 3,
+      "sheet_length_m": "0.001",
+      "unit_name": null,
+      "unit_qty": null,
+      "stock_qty": "0",
+      "reserved_qty": "0",
+      "free_qty": "0",
+      "stock_sheets": 9,
+      "reserved_sheets": 0,
+      "free_sheets": null,
+      "missing_qty": "0",
+      "missing_sheets": null,
+      "dimension_availability": "unknown"
+    }
+  ],
+  "can_execute": false,
+  "issues": [
+    {
+      "code": "DIMENSION_AVAILABILITY_UNKNOWN",
+      "message": "Резерв без размера: доступность листов неизвестна",
+      "product_id": 301,
+      "task_line_id": null,
+      "material_index": 0,
+      "details": {}
+    }
+  ],
+  "proposed_recipe": null
+}

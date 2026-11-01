@@ -16,7 +16,7 @@ import com.logunovinc.workshopmanager.core.ui.*
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(viewModel, lifecycle) {
@@ -25,10 +25,10 @@ fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Un
             awaitCancellation()
         }
     }
-    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onDispatchClick, onRecoveryClick)
+    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onDispatchClick, onManufacturingClick, onRecoveryClick)
 }
 @Composable
-fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
     val task = state.task
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
         item {
@@ -61,8 +61,10 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 task.completedAt?.let { Text("Завершено ${localDate(it)}") }
                 if (task.comment.isNotBlank()) Text(task.comment)
                 if (task.status == TaskStatus.COMPLETED && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
-                if (task.type == TaskType.MANUFACTURE_PRODUCT) Text("Производственный режим требует серверной нормы v2. Старое ручное списание не поддерживается; обратитесь к менеджеру")
+                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported != true) Text("Производственный режим требует серверной нормы v2. Старое ручное списание не поддерживается; обратитесь к менеджеру")
                 if (task.type == TaskType.UNKNOWN || task.status == TaskStatus.UNKNOWN) Text("Неподдерживаемый тип или статус сервера. Изменения недоступны")
+                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported == true) task.production?.let { RecipeSummary(it) }
+                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Изготовить изделие") }
                 if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Отправить товары") }
                 if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Принять товары") }
                 if (task.canStart) Button(onClick = { onIntent(TaskDetailIntent.StartClick) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Взять в работу") }

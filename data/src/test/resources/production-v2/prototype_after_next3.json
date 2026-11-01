@@ -1,0 +1,79 @@
+{
+  "id": 101,
+  "type": "MANUFACTURE_PRODUCT",
+  "status": "in_progress",
+  "version": 4,
+  "warehouse_id": 42,
+  "assignee_user_id": 42,
+  "created_by": 1,
+  "created_at": "2026-11-01T12:00:00Z",
+  "started_at": "2026-11-01T12:01:00Z",
+  "completed_at": null,
+  "due_at": null,
+  "comment": "Synthetic planned v2 fixture",
+  "source_warehouse_id": null,
+  "target_warehouse_id": null,
+  "transfer_id": null,
+  "transfer_version": null,
+  "manufacturing_order_id": 901,
+  "outcome": null,
+  "lines": [
+    {
+      "id": 3002,
+      "product_id": 501,
+      "product_name": "Изделие",
+      "sku": "OUT-501",
+      "role": "output",
+      "base_unit": "шт",
+      "unit_name": "шт",
+      "planned_qty": "10",
+      "actual_qty": "5",
+      "remaining_qty": "5",
+      "planned_unit_qty": "10",
+      "actual_unit_qty": "5",
+      "remaining_unit_qty": "5",
+      "planned_sheets": null,
+      "actual_sheets": null,
+      "remaining_sheets": null,
+      "sheet_length_m": null,
+      "transfer_line_id": null
+    }
+  ],
+  "allowed_actions": [
+    "execute"
+  ],
+  "executions": [],
+  "history": [],
+  "discrepancies": [],
+  "production": {
+    "schema_version": 2,
+    "mode": "prototype_required",
+    "recipe_status": "ready",
+    "recipe_version": 1,
+    "recipe_id": 701,
+    "source": "prototype",
+    "learned_from_execution_id": 5001,
+    "created_by": 42,
+    "created_at": "2026-11-01T12:00:00Z",
+    "basis_measure": "qty",
+    "basis_output": {
+      "qty": "2",
+      "base_unit": "шт",
+      "sheets": null,
+      "sheet_length_m": null
+    },
+    "materials": [
+      {
+        "product_id": 301,
+        "product_name": "Материал",
+        "sku": "MAT-301",
+        "qty": "4",
+        "sheets": null,
+        "sheet_length_m": null,
+        "base_unit": "шт",
+        "unit_name": "шт",
+        "unit_qty": "4"
+      }
+    ]
+  }
+}

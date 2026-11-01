@@ -43,3 +43,11 @@
 ## Этап 7 — 2026-11-01
 - Stock list/detail/server search/pagination/onlyAvailable, dimensions nullable availability, unallocated reserves, shared formatter и read refresh при entry/resume. Catalog/stock-definition отдельные read модели для prototype.
 - Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage7-review.log):82 tests0fail, lint/assembleDebug/architecture. Новые проверки: querypage2,zero/negative,unknownfreeSheets,Long,currentgeometryunits/catalognotstock,403/missingroute и VMfilterrace/debounce55positions/detailrefreshservertruth.
+
+### Изменение внешнего состояния во время этапа8
+Read-only audit: локальный OpenAPI теперь116paths/3productionv2POST. Backend source/spec обнаружены в соседнем sklad; backend обновлён другим процессом, Android агент его не менял/не перезапускал. Снапшот /tmp/workshop-openapi-v2.json передан исполнителю для сверки. Live write-интеграция ещё не проводилась; dedicated fixture worker отсутствует.
+
+## Этап 8 — 2026-11-01
+- V2 client fixed-recipe/prototype: descriptor gate, separate strict DTOs, server-only preview, catalog materialpicker/rawmaterial validation, revision/version-bound confirm, atomic serverACK→freshTask phase switch, exact originalprototype retry. No v1 manufacture fallback/no localrecipe math.
+- Свежая OpenAPI116paths проверена вместе с backend source. Уточнены nullable recipe_status/details,499materials,<1e10 qty/unitqty и duplicate(product,length). Server UTC normalize подтверждён исполнителем read-only.
+- Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage8-review.log),101tests0fail, lint/assembleDebug/architecture. 20positivefixtures дополнительно сверены супервизором сfreshOpenAPI requiredfields/types/enums (не numeric/format validation). Unit/MWS/Room-reopen/VM покрываютfixed20/10→3/6,cumulative-roundingfixtures,prototype2/4→next3/6,409concurrency,originalprototype lostreplyretry,unknownreserve/batch422/deficit,stalepreview/phaseguards. Это клиентские fixtures, не живая serverstock приёмка.

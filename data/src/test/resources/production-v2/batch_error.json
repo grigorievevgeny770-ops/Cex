@@ -1,0 +1,7 @@
+{
+  "code": "RECIPE_BATCH_NOT_SUPPORTED",
+  "message": "Партия несовместима с целыми листами материала",
+  "details": {
+    "next_supported_output_qty": "2"
+  }
+}

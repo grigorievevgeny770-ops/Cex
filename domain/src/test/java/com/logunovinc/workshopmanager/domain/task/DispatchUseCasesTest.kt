@@ -2,6 +2,7 @@ package com.logunovinc.workshopmanager.domain.task
 
 import java.math.BigDecimal
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.production.*
 import com.logunovinc.workshopmanager.domain.pending.*
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -11,6 +12,8 @@ class DispatchUseCasesTest {
     private fun task(remaining: String = "10", sheets: Int? = null) = sampleTask(type = TaskType.DISPATCH_GOODS).copy(lines = listOf(TaskLine(2001, 301, "Изделие", null, "dispatch", "шт", null, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal(remaining), null, null, null, sheets, if (sheets != null) 0 else null, sheets, null)))
     private class Repository : TaskRepository {
         var sent: DispatchCommand? = null
+        override suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview> = error("production not used")
+        override suspend fun manufacture(task: Task, command: ManufacturingCommand, preview: ManufacturingPreview, comment: String): CommandOutcome = error("production not used")
         override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome { sent = command; return CommandOutcome.Confirmed(CommandConfirmation("id", task.id, 4, 5001, false)) }
         override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome = error("unused")
         override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long): Outcome<Page<Task>> = error("unused")

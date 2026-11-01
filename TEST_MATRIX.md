@@ -14,14 +14,14 @@
 |8|Zero final/reason, partial, excess/foreign line|domain/data|Unit/MockWebServer/VM passed; connected pending|
 |9|Frozen sheets/current catalog/baseqty0|data|Unit/MockWebServer/VM passed; connected pending|
 |10|Dispatch partial/remaining/retry/no main credit|data/VM|Unit/MockWebServer/VM passed; connected pending|
-|11|Fixed recipe preview20/10→3/6, no materials in command|MockWebServer|Не запускался|
-|12|Cumulative rounding partial/final — server fixtures only|MockWebServer|Не запускался|
-|13|Prototype q1>1, preview/progress atomic ACK|MockWebServer/VM|Не запускался|
-|14|After prototype by_recipe no material entry|VM/UI|Не запускался|
-|15|Concurrent prototype409/lost response exact prototype retry|data|Не запускался|
-|16|Manual override forbidden/no v1 fallback|data/VM|Не запускался|
-|17|Sheet batch/unknown reserve/missing/preview errors|data/VM|Не запускался|
-|18|Manufacture500 pending/no optimistic stock|data/VM|Не запускался|
+|11|Fixed recipe preview20/10→3/6, no materials in command|MockWebServer|Unit/MockWebServer/Room/VM fixtures passed; live not run|
+|12|Cumulative rounding partial/final — server fixtures only|MockWebServer|Unit/MockWebServer/Room/VM fixtures passed; live not run|
+|13|Prototype q1>1, preview/progress atomic ACK|MockWebServer/VM|Unit/MockWebServer/Room/VM fixtures passed; live not run|
+|14|After prototype by_recipe no material entry|VM/UI|Unit/MockWebServer/Room/VM fixtures passed; live not run|
+|15|Concurrent prototype409/lost response exact prototype retry|data|Unit/MockWebServer/Room/VM fixtures passed; live not run|
+|16|Manual override forbidden/no v1 fallback|data/VM|Unit/MockWebServer/Room/VM fixtures passed; live not run|
+|17|Sheet batch/unknown reserve/missing/preview errors|data/VM|Unit/MockWebServer/Room/VM fixtures passed; live not run|
+|18|Manufacture500 pending/no optimistic stock|data/VM|Unit/MockWebServer/Room/VM fixtures passed; live not run|
 |19|BigDecimal string/Long/formatter separation|unit|Transport string/Long passed; formatter pending|
 |20|Strict per-command fields|serialization|Не запускался|
 |21|Stock/search/pages/negative/unknown/catalog separation|data/VM|Unit/MockWebServer/VM passed; connected pending|

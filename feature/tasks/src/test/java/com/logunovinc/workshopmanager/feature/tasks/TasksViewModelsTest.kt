@@ -2,6 +2,7 @@ package com.logunovinc.workshopmanager.feature.tasks
 
 import androidx.lifecycle.SavedStateHandle
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.production.*
 import com.logunovinc.workshopmanager.domain.task.*
 import com.logunovinc.workshopmanager.domain.pending.*
 import com.logunovinc.workshopmanager.domain.warehouse.*
@@ -29,6 +30,8 @@ class TasksViewModelsTest {
         var starting: suspend () -> CommandOutcome = { CommandOutcome.Confirmed(CommandConfirmation("id", 101, 4, null, false)) }
         override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long): Outcome<Page<Task>> { assertEquals(42L, warehouseId); reads++; return listing(filter, offset) }
         override suspend fun task(id: Long): Outcome<Task> { taskCalls++; assertEquals(101L, id); return reading() }
+        override suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview> = error("production not used")
+        override suspend fun manufacture(task: Task, command: ManufacturingCommand, preview: ManufacturingPreview, comment: String): CommandOutcome = error("production not used")
         override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome = error("dispatch not used")
         override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome = error("receive not used")
         override suspend fun start(task: Task): CommandOutcome { starts++; return starting() }

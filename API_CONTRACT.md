@@ -17,7 +17,7 @@
 - Decimal JSON string, Long IDs/versions, integer sheets; неизвестные enum запрещают mutations.
 - Errors native {code,message,details}, legacy auth {detail}; 401 сохраняет pending, 409 требует refresh, network/500 оставляют unknown.
 
-## Проектируемые production v2 — НЕ существующий API
+## Production v2 — исходно проектируемый, теперь доступен в локальной OpenAPI
 POST api/workshop/v2/tasks/{task_id}/manufacturing-preview и manufacturing-executions.
 Descriptor schema_version2, mode fixed_recipe|prototype_required, recipe_status ready|awaiting_prototype, recipe_version, basis_output/materials.
 Execution mode by_recipe: output(task_line_id,qty либо sheets), expected_version, expected_recipe_version, client_token, comment; materials запрещены.
@@ -27,3 +27,7 @@ Legacy missing descriptor/schema1 — неподдерживаемый productio
 
 ## Durable writes
 До сети Room хранит canonicalBaseUrl+actorId+taskId, exact method/path/UTF-8 body/token, состояние и ACK. Одна активная команда на profile/task, transactional guard + Mutex. Retry побайтно, без новых версий/token. Logout/401 не удаляет pending/ACK, другой actor их не видит. Никаких write-проверок общей БД.
+
+## Повторная capability проверка во время этапа 8
+Локальный сервер обновлён независимо от Android-разработки: OpenAPI HTTP200, 116 paths, присутствуют все три v2 production POST; snapshot /tmp/workshop-openapi-v2.json. Контракт Preview/Descriptor/ByRecipe/Prototype теперь подтверждается локальной схемой и source /Users/chulkova/PetProjects/sklad/code/app/workshop/production_router.py. Наличие routes не означает пройденные live write-сценарии. Android агент не перезапускал и не изменял backend/БД.
+Серверное ТЗ обнаружено: /Users/chulkova/PetProjects/sklad/WORKSHOP_PRODUCTION_NORMS_SPEC.md. Роль frozen output подтверждена production_planning.py/production_create.py как output. Удалённое окружение требует отдельного повторного аудита перед передачей.

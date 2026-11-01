@@ -2,6 +2,7 @@ package com.logunovinc.workshopmanager.feature.tasks
 
 import androidx.lifecycle.SavedStateHandle
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.production.*
 import com.logunovinc.workshopmanager.domain.task.*
 import com.logunovinc.workshopmanager.domain.pending.*
 import java.math.BigDecimal
@@ -23,7 +24,9 @@ class DispatchExecutionViewModelTest {
         var command: DispatchCommand? = null
         var current = sampleTask(type = TaskType.DISPATCH_GOODS).copy(lines = listOf(TaskLine(1001, 301, "Материал", null, "receive", "шт", null, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TEN, null, null, null, null, null, null, null)))
         var receiveResult: suspend () -> CommandOutcome = { CommandOutcome.Confirmed(CommandConfirmation("command", 101, 4, 5001, false)) }
-                override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome { count++; this.command = command; return receiveResult() }
+                override suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview> = error("production not used")
+        override suspend fun manufacture(task: Task, command: ManufacturingCommand, preview: ManufacturingPreview, comment: String): CommandOutcome = error("production not used")
+        override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome { count++; this.command = command; return receiveResult() }
         override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome = error("unused")
         override suspend fun task(id: Long): Outcome<Task> { reads++; return Outcome.Success(current) }
         override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long): Outcome<Page<Task>> = error("unused")

@@ -25,6 +25,7 @@ import kotlinx.serialization.json.JsonObject
     @SerialName("manufacturing_order_id") val manufacturingOrderId: Long? = null,
     val outcome: String? = null, val lines: List<TaskLineDto>,
     @SerialName("allowed_actions") val allowedActions: List<String>,
+    val production: ProductionDescriptorDto? = null,
     val executions: List<ExecutionDto> = emptyList(), val history: List<HistoryDto> = emptyList(),
     val discrepancies: List<DiscrepancyDto> = emptyList(),
 )

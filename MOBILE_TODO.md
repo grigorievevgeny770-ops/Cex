@@ -9,7 +9,7 @@
 - [x] 5. Receive partial/final/shortage/sheets/recovery
 - [x] 6. Dispatch partial/confirmation/exact retry
 - [x] 7. Stock search/pagination/detail/dimensions
-- [ ] 8. Production v2 preview/prototype/by_recipe с контрактными fixtures
+- [x] 8. Production v2 preview/prototype/by_recipe с контрактными fixtures
 - [ ] 9. Regression, Compose E2E, lint, APK, передача
 
-На каждом этапе исполнитель пишет application code и tests; супервизор проверяет и делает локальный commit. Push/deploy не разрешены. Живая production v2 интеграция заблокирована внешним backend.
+На каждом этапе исполнитель пишет application code и tests; супервизор проверяет и делает локальный commit. Push/deploy не разрешены. Локальный backend v2 появился во время этапа8; живая write-интеграция ожидает выделенный synthetic backend/worker.
