@@ -30,3 +30,8 @@
 - Workshop resolver, server task filters/pagination, task detail/start через durable dispatcher, полная paged история/исполнения, recovery journal UI, lifecycle RESUMED polling30sec и shared quantity/date formatter.
 - Review: защищены StartClick во время Sending, stale detail после refresh failure; missing/inactive warehouse очищает устаревший список; malformed dates классифицируются как incompatible server.
 - Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage4-review.log), 52 tests0fail/errors: domain8/data35/coreUI1/auth1/tasks7; lint/assembleDebug/architecture passed. Проверены ID42 после main7, filters/races, >50history, current taskversion из ACK вместо result,409/403 без fallback. Compose execution E2E остаётся этапу9.
+
+## Этап 5 — 2026-11-01
+- Receive delta input/review/confirm через journal: partial/final shortage/zero final/reason, frozen sheets и exact comma decimals; no loss approval/no optimistic stock.
+- Detail refresh при RESUMED и journal observer безопасно снимают блокировку только matching ACK. Input/review не отправляют writes, submit flight guard.
+- Независимый ./scripts/verify.sh SUCCESSFUL (/tmp/workshop-stage5-review.log):63 tests0fail, lint/assembleDebug. Новые domain5/data3/VM3 проверяют10→4→5finalshortage1,zeroFinal,sheets-onlyqty0,foreign/overremaining/overprecision,unknown exactretry, recreated VM pending→ACK→fresh detail. Live backend writes не выполнялись.

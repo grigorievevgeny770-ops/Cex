@@ -9,10 +9,10 @@
 |3|Workshop42 после main7, missing/inactive/403|domain/data|Unit/MockWebServer/VM passed; Compose pending|
 |4|Task scope/paging/filter race/unknown enums|data/VM|Unit/MockWebServer/VM passed; Compose pending|
 |5|Start, worker race, stale version, permissions|data/VM|Unit/MockWebServer/VM passed; Compose pending|
-|6|Receive full/partial/multiple step delta|domain/data|Не запускался|
-|7|Receive10→4→5 final shortage1 без loss approval|data/VM|Не запускался|
-|8|Zero final/reason, partial, excess/foreign line|domain/data|Не запускался|
-|9|Frozen sheets/current catalog/baseqty0|data|Не запускался|
+|6|Receive full/partial/multiple step delta|domain/data|Unit/MockWebServer/VM passed; connected pending|
+|7|Receive10→4→5 final shortage1 без loss approval|data/VM|Unit/MockWebServer/VM passed; connected pending|
+|8|Zero final/reason, partial, excess/foreign line|domain/data|Unit/MockWebServer/VM passed; connected pending|
+|9|Frozen sheets/current catalog/baseqty0|data|Unit/MockWebServer/VM passed; connected pending|
 |10|Dispatch partial/remaining/retry/no main credit|data/VM|Не запускался|
 |11|Fixed recipe preview20/10→3/6, no materials in command|MockWebServer|Не запускался|
 |12|Cumulative rounding partial/final — server fixtures only|MockWebServer|Не запускался|

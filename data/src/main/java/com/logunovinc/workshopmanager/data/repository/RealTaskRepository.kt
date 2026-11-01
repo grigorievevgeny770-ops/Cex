@@ -16,6 +16,24 @@ class RealTaskRepository(private val remote: WorkshopRemoteDataSource, private v
     }
     override suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int, offset: Long) = map(remote.tasks(warehouseId, filter, limit, offset)) { mapper.page(it, mapper::task) }
     override suspend fun task(id: Long) = map(remote.task(id), mapper::task)
+    override suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome {
+        if (task.type != TaskType.RECEIVE_GOODS || !task.canExecute || task.transferVersion == null)
+            return CommandOutcome.Rejected(null, AppError(ErrorKind.FORBIDDEN, "Приёмка недоступна; обновите задание"))
+        val transferVersion = task.transferVersion ?: return CommandOutcome.Rejected(null, AppError(ErrorKind.VALIDATION, "Неизвестна версия перемещения"))
+        val byId = task.lines.associateBy(TaskLine::id)
+        val lines = command.lines.map { line ->
+            val product = byId[line.taskLineId]
+            "${product?.productName ?: "Строка"} · строка №${line.taskLineId}: " + (line.sheets?.let { "$it листов" } ?: "${line.quantity?.toPlainString()} ${product?.baseUnit.orEmpty()}")
+        }
+        val mode = if (command.final) "Окончательная приёмка" else "Частичная приёмка — продолжить ожидание"
+        val summary = CommandSummary("$mode · задание №${task.id}", lines + listOf("Версия задания ${task.version}, перемещения ${task.transferVersion}") +
+            (if (command.reason.isNotBlank()) listOf("Причина: ${command.reason}") else emptyList()), command.comment)
+        return dispatcher.submit(task.id, "RECEIVE_GOODS", "POST", "api/workshop/tasks/${task.id}/executions", summary) { token ->
+            json.encodeToString(ReceiveRequestDto(expectedVersion = task.version, expectedTransferVersion = transferVersion,
+                clientToken = token, comment = command.comment, lines = command.lines.map { ReceiveLineDto(it.taskLineId, it.quantity, it.sheets) },
+                final = command.final, reason = command.reason)).toByteArray(Charsets.UTF_8)
+        }
+    }
     override suspend fun start(task: Task): CommandOutcome {
         if (!task.canStart) return CommandOutcome.Rejected(null, AppError(ErrorKind.FORBIDDEN, "Действие недоступно"))
         return dispatcher.submit(task.id, "start", "POST", "api/workshop/tasks/${task.id}/start",

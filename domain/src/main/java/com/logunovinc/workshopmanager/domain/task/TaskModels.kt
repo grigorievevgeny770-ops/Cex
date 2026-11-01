@@ -40,6 +40,7 @@ data class Task(
 interface TaskRepository {
     suspend fun tasks(warehouseId: Long, filter: TaskFilter, limit: Int = 50, offset: Long = 0): Outcome<Page<Task>>
     suspend fun task(id: Long): Outcome<Task>
+    suspend fun receive(task: Task, command: ReceiveCommand): CommandOutcome
     suspend fun start(task: Task): CommandOutcome
     suspend fun executions(taskId: Long, limit: Int = 50, offset: Long = 0): Outcome<Page<Execution>>
     suspend fun execution(taskId: Long, executionId: Long): Outcome<Execution>

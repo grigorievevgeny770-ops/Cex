@@ -22,6 +22,7 @@ sealed interface SubmissionState {
 data class TaskDetailUiState(
     val loading: Boolean = true, val task: Task? = null, val error: AppError? = null,
     val submission: SubmissionState = SubmissionState.Idle, val staleTask: Boolean = false,
+    val pending: PendingCommand? = null,
     val executions: List<Execution> = emptyList(), val executionsLoading: Boolean = false,
     val executionsOffset: Long = 0, val executionsMore: Boolean = false, val executionsError: AppError? = null,
     val history: List<HistoryEntry> = emptyList(), val historyLoading: Boolean = false,
@@ -39,16 +40,27 @@ sealed interface TaskDetailIntent {
 class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle,
     private val loadTask: LoadTaskUseCase, private val startTask: StartTaskUseCase,
     private val loadExecutions: LoadExecutionsUseCase, private val loadHistory: LoadHistoryUseCase,
+    pending: PendingCommandRepository,
 ) : ViewModel() {
     private val taskId: Long = checkNotNull(savedStateHandle["taskId"])
     private val mutableState = MutableStateFlow(TaskDetailUiState())
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
-    init { refresh() }
+    init {
+        viewModelScope.launch { pending.observe().collect { commands ->
+            val current = uiState.value
+            val unresolvedId = (current.submission as? SubmissionState.Unresolved)?.command?.id ?: current.pending?.id
+            val recovered = commands.firstOrNull { it.id == unresolvedId && it.state == PendingState.ACKNOWLEDGED }?.confirmation
+            val blocked = commands.firstOrNull { it.taskId == taskId && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
+            mutableState.update { it.copy(pending = blocked, submission = recovered?.let(SubmissionState::Confirmed) ?: it.submission) }
+            if (recovered != null) refresh()
+        } }
+        refresh()
+    }
     fun onIntent(intent: TaskDetailIntent) {
         when (intent) {
             TaskDetailIntent.Refresh -> if (uiState.value.submission != SubmissionState.Sending) refresh()
-            TaskDetailIntent.StartClick -> if (uiState.value.task?.canStart == true && !uiState.value.loading && !uiState.value.staleTask && uiState.value.submission !in setOf(SubmissionState.Sending, SubmissionState.ConfirmStart) && uiState.value.submission !is SubmissionState.Unresolved) mutableState.update { it.copy(submission = SubmissionState.ConfirmStart) }
+            TaskDetailIntent.StartClick -> if (uiState.value.task?.canStart == true && uiState.value.pending == null && !uiState.value.loading && !uiState.value.staleTask && uiState.value.submission !in setOf(SubmissionState.Sending, SubmissionState.ConfirmStart) && uiState.value.submission !is SubmissionState.Unresolved) mutableState.update { it.copy(submission = SubmissionState.ConfirmStart) }
             TaskDetailIntent.DismissConfirmation -> if (uiState.value.submission == SubmissionState.ConfirmStart) mutableState.update { it.copy(submission = SubmissionState.Idle) }
             TaskDetailIntent.ConfirmStart -> confirmStart()
             TaskDetailIntent.LoadMoreExecutions -> executions(reset = false)
@@ -70,7 +82,7 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
         }
     }
     private fun confirmStart() {
-        if (uiState.value.submission != SubmissionState.ConfirmStart || uiState.value.loading || uiState.value.staleTask || uiState.value.task?.canStart != true) return
+        if (uiState.value.pending != null || uiState.value.submission != SubmissionState.ConfirmStart || uiState.value.loading || uiState.value.staleTask || uiState.value.task?.canStart != true) return
         val task = uiState.value.task ?: return
         mutableState.update { it.copy(submission = SubmissionState.Sending) }
         viewModelScope.launch {

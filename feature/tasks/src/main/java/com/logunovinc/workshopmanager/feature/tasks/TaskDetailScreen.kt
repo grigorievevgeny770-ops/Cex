@@ -8,16 +8,27 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.awaitCancellation
 import com.logunovinc.workshopmanager.core.ui.*
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun TaskDetailRoute(viewModel: TaskDetailViewModel, onRecoveryClick: () -> Unit) {
+fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    TaskDetailScreen(state, viewModel::onIntent, onRecoveryClick)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            if (!viewModel.uiState.value.loading) viewModel.onIntent(TaskDetailIntent.Refresh)
+            awaitCancellation()
+        }
+    }
+    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onRecoveryClick)
 }
 @Composable
-fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
     val task = state.task
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
         item {
@@ -37,6 +48,7 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 SubmissionState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
                 else -> Unit
             }
+            state.pending?.let { pending -> Text("Сохранённый запрос: ${pending.summary.title}"); TextButton(onClick = onRecoveryClick) { Text("Открыть журнал запросов") } }
             if (state.staleTask) Text("Для следующих действий нужно получить актуальную карточку")
         }
         if (task != null) {
@@ -51,7 +63,8 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 if (task.status == TaskStatus.COMPLETED && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
                 if (task.type == TaskType.MANUFACTURE_PRODUCT) Text("Производственный режим требует серверной нормы v2. Старое ручное списание не поддерживается; обратитесь к менеджеру")
                 if (task.type == TaskType.UNKNOWN || task.status == TaskStatus.UNKNOWN) Text("Неподдерживаемый тип или статус сервера. Изменения недоступны")
-                if (task.canStart) Button(onClick = { onIntent(TaskDetailIntent.StartClick) }, enabled = !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Взять в работу") }
+                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Принять товары") }
+                if (task.canStart) Button(onClick = { onIntent(TaskDetailIntent.StartClick) }, enabled = state.pending == null && !state.loading && !state.staleTask && state.submission != SubmissionState.Sending && state.submission !is SubmissionState.Unresolved) { Text("Взять в работу") }
             }
             items(task.lines, key = { "line-${it.id}" }) { line -> TaskLineCard(line) }
             items(task.discrepancies, key = { "difference-${it.id}" }) { discrepancy ->

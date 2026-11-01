@@ -6,7 +6,7 @@
 - [x] 2. DTO, HTTP, точные числа, защищённая cookie-сессия, Login/Restore/Logout
 - [x] 3. Room PendingCommand, dispatcher, exact retry/recovery до write UI
 - [x] 4. Workshop resolver, task list/detail/start/full history
-- [ ] 5. Receive partial/final/shortage/sheets/recovery
+- [x] 5. Receive partial/final/shortage/sheets/recovery
 - [ ] 6. Dispatch partial/confirmation/exact retry
 - [ ] 7. Stock search/pagination/detail/dimensions
 - [ ] 8. Production v2 preview/prototype/by_recipe с контрактными fixtures
