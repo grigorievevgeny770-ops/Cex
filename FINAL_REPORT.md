@@ -6,7 +6,7 @@
 
 `app/build/outputs/apk/debug/app-debug.apk` — 14 945 409 байт.
 
-SHA256: `b4d8e2c3327c481003079d71557d26e02de29136fb9ef2687eeaa614e2c5666e`.
+SHA256: `3a48363c40915f75c5422a61a18626b3964d8da58fffa20ca192838eced86167`.
 
 APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
 
@@ -62,3 +62,5 @@ Task assignee filters removed at user request. Requests always omit assignee_use
 Action audit is now debug-only, collapsed by default and loaded only when expanded. Assignee/actor labels and task-line identifiers are removed from task detail and execution display, including debug. Operational facts and command recovery remain available. Independent107tests/lint/APK/test-APK build passed.
 
 Manual task lifecycle removed: no TaskStatus/domain assignment/start producer, no status filters/labels/start controls. Direct execution uses server permissions and completion flags, with legacy transport compatibility. Independent110JVM tests,4device tests,lint/build/test-APK passed. The currently running local server still advertises legacy assignment restrictions; any-worker server rollout is an external integration requirement, not bypassed by the client.
+
+Warehouse list/detail no longer display reserved quantities, reserved sheets or unallocated reserved amounts. Physical/free server values remain; data contracts and server reserve accounting are unchanged. Independent110tests/lint/build passed; normal debug APK updated on emulator.

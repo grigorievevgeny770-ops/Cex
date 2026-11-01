@@ -80,7 +80,7 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
                 position.sku?.let { Text("Артикул $it") }
                 Text("Товар №${position.productId}")
                 StockTotals(position)
-                Text("Без распределения по размерам: физически ${QuantityFormatter.format(position.unallocatedStock)}, резерв ${QuantityFormatter.format(position.unallocatedReserved)} ${position.baseUnit}")
+                Text("Без распределения по размерам: физически ${QuantityFormatter.format(position.unallocatedStock)} ${position.baseUnit}")
                 Text("Размеры и листы", style = MaterialTheme.typography.titleLarge)
                 if (position.dimensions.isEmpty()) Text("Размерных остатков нет")
             }
@@ -88,7 +88,6 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
                 Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Длина ${QuantityFormatter.format(dimension.length)} м", style = MaterialTheme.typography.titleMedium)
                     Text("Физически ${QuantityFormatter.format(dimension.quantity)} ${position.baseUnit} · ${dimension.sheets} листов")
-                    Text("Резерв ${QuantityFormatter.format(dimension.reserved)} ${position.baseUnit} · ${dimension.reservedSheets} листов")
                     Text("Свободно ${dimension.free?.let(QuantityFormatter::format) ?: "неизвестно"} ${position.baseUnit}")
                     Text("Свободных листов: ${dimension.freeSheets?.toString() ?: "неизвестно"}")
                 } }
@@ -99,6 +98,5 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
 @Composable
 private fun StockTotals(position: StockPosition) {
     Text("Физически: ${QuantityFormatter.format(position.quantity)} ${position.baseUnit}")
-    Text("В резерве: ${QuantityFormatter.format(position.reserved)} ${position.baseUnit}")
     Text("Свободно: ${QuantityFormatter.format(position.free)} ${position.baseUnit}", color = if (position.free.signum() < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
 }

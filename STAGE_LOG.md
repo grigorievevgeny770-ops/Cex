@@ -84,3 +84,8 @@ Read-only audit: локальный OpenAPI теперь116paths/3productionv2PO
 - Independent ./scripts/verify.sh SUCCESSFUL110tests/lint/build; :app:assembleDebugAndroidTest SUCCESSFUL. Manual isolated device instrumentation OK4tests12.003s. Logs /tmp/workshop-direct-execution-review.log, /tmp/workshop-direct-execution-test-apk-review.log, /tmp/workshop-direct-execution-device-review.log. No real backend writes.
 - Updated normal debug APK installed/launched Statusok.14945409bytes SHA256b4d8e2c3327c481003079d71557d26e02de29136fb9ef2687eeaa614e2c5666e.
 - Final read-only runtime audit still shows old TaskRead.status and /start endpoint (116paths). Backend source is concurrently being updated in another repository; it was not edited/restarted/deployed by this Android task. Any employee accessing formerly assigned tasks still requires that server rollout; existing ACL is not bypassed.
+
+## 2026-11-02 — hide warehouse reserve quantities
+- Removed reserve displays from warehouse list/detail totals, dimensions/sheet reserves and unallocated reserve fragment. Physical/free values and unknown availability preserved. DTO/domain/server reserve accounting and production previews unchanged.
+- Independent ./scripts/verify.sh SUCCESSFUL110tests/lint/assembleDebug/architecture, /tmp/workshop-hide-stock-reserves-review.log. No mirrored label tests added; connected test sources unchanged. No backend writes.
+- Normal debug APK installed/launched Statusok;14945409bytes SHA2563a48363c40915f75c5422a61a18626b3964d8da58fffa20ca192838eced86167.
