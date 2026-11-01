@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
 @Module
 @InstallIn(SingletonComponent::class)
 object ApplicationModule {
-    private const val DEFAULT_URL = "https://147-45-154-211.sslip.io/"
+    private const val DEFAULT_URL = BuildConfig.DEFAULT_BASE_URL
     @Provides @Singleton fun json(): Json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
     @Provides @Singleton fun cookieStorage(@ApplicationContext context: Context): CookieStorage = EncryptedCookieStorage(context)
     @Provides @Singleton fun cookieJar(storage: CookieStorage) = PersistentSessionCookieJar(storage)

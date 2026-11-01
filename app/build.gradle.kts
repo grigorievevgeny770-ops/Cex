@@ -1,9 +1,15 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+val releaseBaseUrl = providers.gradleProperty("releaseBaseUrl").orElse("https://example.invalid/").get()
+require(URI(releaseBaseUrl).scheme == "https") { "releaseBaseUrl must use HTTPS" }
+val releaseBaseUrlLiteral = "\"" + releaseBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.logunovinc.workshopmanager"
@@ -15,6 +21,10 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        debug { buildConfigField("String", "DEFAULT_BASE_URL", "\"http://10.0.2.2:8000/\"") }
+        release { buildConfigField("String", "DEFAULT_BASE_URL", releaseBaseUrlLiteral) }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
