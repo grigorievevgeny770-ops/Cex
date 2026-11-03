@@ -16,15 +16,19 @@ data class AuthUiState(
     val actor: Actor? = null,
     val environment: String = "",
     val environmentInput: String = "",
+    val serverOption: ServerOption = ServerOption.REMOTE,
     val login: String = "",
     val password: String = "",
     val error: String? = null,
     val notice: String? = null,
-)
+) {
+    val environmentApplied: Boolean get() = environment.isNotBlank() && CanonicalBaseUrl.parse(environmentInput) == environment
+}
 sealed interface AuthIntent {
     data class LoginChanged(val value: String) : AuthIntent
     data class PasswordChanged(val value: String) : AuthIntent
     data class EnvironmentChanged(val value: String) : AuthIntent
+    data class ServerSelected(val option: ServerOption) : AuthIntent
     data object ApplyEnvironment : AuthIntent
     data object LoginClick : AuthIntent
     data object LogoutClick : AuthIntent
@@ -50,7 +54,7 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch { repository.environment.collect { url ->
             mutableState.update {
                 val changed = it.environment.isNotBlank() && it.environment != url
-                it.copy(environment = url, environmentInput = url, login = if (changed) "" else it.login, password = if (changed) "" else it.password)
+                it.copy(environment = url, environmentInput = url, serverOption = ServerOption.forUrl(url), login = if (changed) "" else it.login, password = if (changed) "" else it.password)
             }
         } }
         perform(prefillAfterRestore = true) { restore() }
@@ -59,13 +63,37 @@ class AuthViewModel @Inject constructor(
         when (intent) {
             is AuthIntent.LoginChanged -> mutableState.update { it.copy(login = intent.value, error = null) }
             is AuthIntent.PasswordChanged -> mutableState.update { it.copy(password = intent.value, error = null) }
-            is AuthIntent.EnvironmentChanged -> mutableState.update { it.copy(environmentInput = intent.value, error = null) }
+            is AuthIntent.EnvironmentChanged -> if (!uiState.value.busy && !uiState.value.restoring) mutableState.update { it.copy(environmentInput = intent.value, serverOption = ServerOption.CUSTOM, error = null) }
+            is AuthIntent.ServerSelected -> {
+                val state = uiState.value
+                if (state.busy || state.restoring) return
+                if (intent.option == ServerOption.CUSTOM) mutableState.update { it.copy(serverOption = intent.option, login = "", password = "", error = null) }
+                else {
+                    val url = checkNotNull(intent.option.baseUrl)
+                    if (state.environment == url) mutableState.update { it.copy(serverOption = intent.option, environmentInput = url, error = null) }
+                    else {
+                        mutableState.update { it.copy(login = "", password = "") }
+                        perform { changeEnvironment(url) }
+                    }
+                }
+            }
             AuthIntent.LoginClick -> {
                 val current = uiState.value
+                if (!current.environmentApplied) {
+                    mutableState.update { it.copy(error = "Сначала примените адрес выбранного сервера") }
+                    return
+                }
                 perform { login(current.login, current.password) }
             }
             AuthIntent.LogoutClick -> perform { logout() }
-            AuthIntent.ApplyEnvironment -> { val url = uiState.value.environmentInput; perform { changeEnvironment(url) } }
+            AuthIntent.ApplyEnvironment -> {
+                val url = uiState.value.environmentInput
+                perform {
+                    val result = changeEnvironment(url)
+                    if (result is Outcome.Success) mutableState.update { it.copy(serverOption = ServerOption.forUrl(repository.environment.value), environmentInput = repository.environment.value) }
+                    result
+                }
+            }
             AuthIntent.RetryRestore -> perform { restore() }
         }
     }

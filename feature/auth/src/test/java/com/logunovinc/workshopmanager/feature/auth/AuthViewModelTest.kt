@@ -17,6 +17,7 @@ class AuthViewModelTest {
         override val session = MutableStateFlow(SessionState())
         override val environment = MutableStateFlow(baseUrl)
         var calls = 0
+        var environmentWrites=0
         val loginGate = CompletableDeferred<Unit>()
         var restoreError = AppError(ErrorKind.AUTHENTICATION, "Войдите")
         override suspend fun restore(): Outcome<Actor> { session.value = SessionState(restoring = false); return Outcome.Failure(restoreError) }
@@ -28,7 +29,7 @@ class AuthViewModelTest {
             return Outcome.Success(actor)
         }
         override suspend fun logout(): Outcome<Boolean> { session.value = SessionState(restoring = false); return Outcome.Success(false) }
-        override suspend fun changeEnvironment(baseUrl: String): Outcome<Unit> { environment.value = baseUrl; return Outcome.Success(Unit) }
+        override suspend fun changeEnvironment(baseUrl: String): Outcome<Unit> { environmentWrites++;environment.value = baseUrl; return Outcome.Success(Unit) }
     }
     private fun viewModel(repository: Repository, prefill: AuthPrefill) = AuthViewModel(repository, LoginUseCase(repository), RestoreSessionUseCase(repository), LogoutUseCase(repository), ChangeEnvironmentUseCase(repository), prefill)
     @Test fun localStartupPrefillsWithoutAutomaticallyLoggingIn() = runTest(dispatcher) {
@@ -92,4 +93,49 @@ class AuthViewModelTest {
         runCurrent()
         assertNull(vm.uiState.value.actor)
     }
+    @Test fun choosingRemoteAppliesAndPersistsWithoutLoginOrLeakingLocalPrefill() = runTest(dispatcher) {
+        val repository=Repository("http://10.0.2.2:8000/")
+        val prefill=AuthPrefill("fixture-local-user","fixture-local-password")
+        val vm=viewModel(repository,prefill);runCurrent()
+        assertEquals(ServerOption.EMULATOR,vm.uiState.value.serverOption)
+        vm.onIntent(AuthIntent.ServerSelected(ServerOption.REMOTE));runCurrent()
+        assertEquals("https://147-45-154-211.sslip.io/",repository.environment.value)
+        assertEquals(ServerOption.REMOTE,vm.uiState.value.serverOption)
+        assertEquals("",vm.uiState.value.login);assertEquals("",vm.uiState.value.password)
+        assertEquals(0,repository.calls);assertEquals(1,repository.environmentWrites)
+        val recreated=viewModel(repository,prefill);runCurrent()
+        assertEquals(ServerOption.REMOTE,recreated.uiState.value.serverOption)
+        assertEquals("",recreated.uiState.value.password);assertEquals(0,repository.calls)
+    }
+    @Test fun customChoiceDoesNotSwitchUntilAppliedAndDraftCannotLoginIntoPreviousServer() = runTest(dispatcher) {
+        val repository=Repository(ServerOption.REMOTE.baseUrl!!)
+        val vm=viewModel(repository,AuthPrefill());runCurrent()
+        vm.onIntent(AuthIntent.ServerSelected(ServerOption.CUSTOM))
+        vm.onIntent(AuthIntent.EnvironmentChanged("https://custom.example/warehouse"))
+        vm.onIntent(AuthIntent.LoginChanged("worker"));vm.onIntent(AuthIntent.PasswordChanged("transient"))
+        vm.onIntent(AuthIntent.LoginClick);runCurrent()
+        assertEquals(0,repository.calls);assertEquals(0,repository.environmentWrites)
+        assertFalse(vm.uiState.value.environmentApplied)
+        assertEquals(ServerOption.REMOTE.baseUrl,repository.environment.value)
+        vm.onIntent(AuthIntent.ApplyEnvironment);runCurrent()
+        assertEquals("https://custom.example/warehouse/",repository.environment.value)
+        assertEquals(ServerOption.CUSTOM,vm.uiState.value.serverOption);assertTrue(vm.uiState.value.environmentApplied)
+        val recreated=viewModel(repository,AuthPrefill());runCurrent()
+        assertEquals(ServerOption.CUSTOM,recreated.uiState.value.serverOption)
+        assertEquals(repository.environment.value,recreated.uiState.value.environmentInput)
+        assertEquals("",recreated.uiState.value.password)
+    }
+    @Test fun presetSelectionOverridesUnappliedDraftAndRemoteDefaultNeverPrefills() = runTest(dispatcher) {
+        val repository=Repository(ServerOption.REMOTE.baseUrl!!)
+        val vm=viewModel(repository,AuthPrefill("fixture-local-user","fixture-local-password"));runCurrent()
+        assertEquals(ServerOption.REMOTE,vm.uiState.value.serverOption);assertEquals("",vm.uiState.value.login);assertEquals("",vm.uiState.value.password)
+        vm.onIntent(AuthIntent.ServerSelected(ServerOption.CUSTOM));vm.onIntent(AuthIntent.EnvironmentChanged("invalid"));vm.onIntent(AuthIntent.ApplyEnvironment);runCurrent()
+        assertNotNull(vm.uiState.value.error);assertEquals(0,repository.environmentWrites)
+        vm.onIntent(AuthIntent.ServerSelected(ServerOption.REMOTE));runCurrent()
+        assertEquals(ServerOption.REMOTE,vm.uiState.value.serverOption);assertEquals(ServerOption.REMOTE.baseUrl,vm.uiState.value.environmentInput)
+        vm.onIntent(AuthIntent.ServerSelected(ServerOption.USB));runCurrent()
+        assertEquals("http://127.0.0.1:8000/",repository.environment.value);assertEquals(ServerOption.USB,vm.uiState.value.serverOption)
+        assertEquals(0,repository.calls)
+    }
+
 }

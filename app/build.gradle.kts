@@ -14,7 +14,7 @@ val debugPrefillProperties = Properties().apply {
 }
 fun buildConfigString(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
 
-val releaseBaseUrl = providers.gradleProperty("releaseBaseUrl").orElse("https://example.invalid/").get()
+val releaseBaseUrl = providers.gradleProperty("releaseBaseUrl").orElse("https://147-45-154-211.sslip.io/").get()
 require(URI(releaseBaseUrl).scheme == "https") { "releaseBaseUrl must use HTTPS" }
 val fixtureBaseUrl = providers.gradleProperty("fixtureBaseUrl").orElse("http://127.0.0.1:9/").get()
 require(URI(fixtureBaseUrl).scheme == "http" && URI(fixtureBaseUrl).host in setOf("10.0.2.2", "127.0.0.1", "localhost")) { "fixtureBaseUrl must be a local debug HTTP address" }
@@ -37,7 +37,7 @@ android {
     sourceSets.getByName("androidTest").assets.srcDir("../data/src/test/resources")
     buildTypes {
         debug {
-            buildConfigField("String", "DEFAULT_BASE_URL", "\"http://10.0.2.2:8000/\"")
+            buildConfigField("String", "DEFAULT_BASE_URL", "\"https://147-45-154-211.sslip.io/\"")
             buildConfigField("String", "DEBUG_PREFILL_LOGIN", buildConfigString(debugPrefillProperties.getProperty("debug.prefill.login", "")))
             buildConfigField("String", "DEBUG_PREFILL_PASSWORD", buildConfigString(debugPrefillProperties.getProperty("debug.prefill.password", "")))
         }

@@ -4,11 +4,11 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 767 389 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 810 148 байт.
 
-SHA256: `ed372bd74ca733d90b2794ac740b250c216d77fc30a7687c75c496d7e96267cf`.
+SHA256: `a3dc82d7b8b758e2c0ef6849edf5f97554b41c41630ebcd2171ae6484cb47fd4`.
 
-APK установлен и запущен на emulator-5554/API37. Debug default: `http://10.0.2.2:8000/`. SDK/JDK и настройка окружений — в README.md.
+APK установлен и запущен на emulator-5554/API37. Debug/release default: `https://147-45-154-211.sslip.io/` (saved environment takes precedence). SDK/JDK и настройка окружений — в README.md.
 
 ```sh
 ./scripts/verify.sh
@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 125 JVM-тестов, 7 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 128 JVM-тестов, 8 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -106,3 +106,8 @@ attestation привязывает UI к owned marker/revision до входа. 
 Добавлена отдельная кнопка «Завершить приёмку»: открывает существующий final receive workflow с фактом текущего шага и причиной недостачи. Нулевой новый факт допустим, предыдущие поступления сохраняются; close-incomplete для RECEIVE не вызывается. Навигация и rotation не отправляют команды.
 
 Проверено: 125 JVM, 7 connected, lint/assembleDebug; /tmp/tseh-final-receive-verify2.log. Независимый root verify: /tmp/tseh-receive-root-verify.log BUILD SUCCESSFUL. Compose: partial4 → zero final с причиной, exact lines[] и transfer version3; факты4/remaining6 сохранены. Actual backend: /tmp/tseh-final-receive-real-run1/result.json PASS, revision565e9e69881bb36eb61507f4d02a4e10c64fd96d, partial4 → новая кнопка → final5/shortage1. Только owned SQLite fixture, без пользовательских складских движений.
+
+## 2026-11-03 — селектор сервера и новый default
+На экране входа: удалённый HTTPS147-45-154-211.sslip.io, локальный emulator10.0.2.2:8000, USB127.0.0.1:8000 и свой URL. Пользователь явно выбрал remote default для обычного debug/release; существующий сохранённый выбор не перезаписывается. Пункт своего URL требует применения, до этого вход заблокирован. Смена адреса использует прежний session/cookie generation guard и очищает credentials; pending остаются по server+actor. Выбор не вызывает login/HTTP и не делает fallback. ProcessFixture/test DI остаются изолированными.
+
+128unit +8connected,0fail/errors/skips,lint/assembleDebug: /tmp/tseh-server-selector-verify2.log. Независимый root verify: /tmp/tseh-server-selector-root-verify.log. Новая Compose-проверка использует fake repository и не подключается к удалённому серверу; живую совместимость/авторизацию этого сервера данный этап не проверяет. Предыдущие real-backend E2E отчёты относятся к предшествующим этапам.

@@ -115,3 +115,6 @@ Read-only audit: локальный OpenAPI теперь116paths/3productionv2PO
 
 ## 2026-11-02 — завершение приёмки из карточки
 Исполнитель реализовал отдельный callback и receive?final=true как SavedStateHandle form initialization; existing UseCase/Repository/dispatcher unchanged. Review removed prospective arithmetic from Composable; summary renders server plan/previous/remaining plus prepared new fact. 125unit/7connected passed; /tmp/tseh-final-receive-verify2.log. Независимый root scripts/verify.sh passed: /tmp/tseh-receive-root-verify.log. Real fixture baseline with new final entry passed: /tmp/tseh-final-receive-real-run1/result.json. APK 14767389 bytes SHA256 ed372bd74ca733d90b2794ac740b250c216d77fc30a7687c75c496d7e96267cf.
+
+## 2026-11-03 — селектор и remote default
+Исполнитель: enum public presets, stateless Compose dropdown, MVI ServerSelected, custom apply guard, existing ChangeEnvironmentUseCase/session storage; remote default normal debug/release, fixture/test defaults unchanged. Root reviewed code/tests and ran independent scripts/verify.sh: /tmp/tseh-server-selector-root-verify.log SUCCESS. Full connected verify: /tmp/tseh-server-selector-verify2.log,128unit/8device0fail0skip. No real remote login/writes in tests. APK 14810148 bytes SHA256 a3dc82d7b8b758e2c0ef6849edf5f97554b41c41630ebcd2171ae6484cb47fd4.

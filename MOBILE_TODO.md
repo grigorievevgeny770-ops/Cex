@@ -21,3 +21,6 @@
 
 ## Дополнение: завершение приёмки
 - [x] Отдельный вход в final-форму из карточки, zero-final и явное подтверждение, regression/Compose/real-backend проверка, APK и локальный commit.
+
+## Дополнение: селектор сервера
+- [x] Preset dropdown + remote HTTPS default + custom URL; regression/Compose и debug APK, локальный commit.

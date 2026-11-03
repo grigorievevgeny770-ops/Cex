@@ -55,3 +55,6 @@ All real write cases use a separately archived backend and a newly owned SQLite 
 
 ## Receive final entry
 125 JVM + 7 connected tests: 0 failures/errors/skips. New final navigation initializes only the form, read refresh/rotation never POST; partial4 → empty final lines[]/reason/transfer version3 preserves received4 and shortage6. Explicit final receipt by second worker via the new button passed actual backend fixture (4+5final, shortage1): /tmp/tseh-final-receive-real-run1/result.json.
+
+## Server selector/default (2026-11-03)
+128 JVM и8 connected tests passed,0 failures/errors/skips. Remote default BuildConfig and empty remote credentials; explicit preset changes persist through repository/new ViewModel, clear local credentials and do not login. Custom draft requires canonical URL apply and blocks unintended old-server login. Pure Compose test covers remote/emulator/USB/custom without external HTTP. Existing real E2E were not repeated for this presentation/default-only change.

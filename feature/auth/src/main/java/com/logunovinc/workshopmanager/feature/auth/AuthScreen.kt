@@ -28,9 +28,25 @@ fun AuthScreen(state: AuthUiState, onIntent: (AuthIntent) -> Unit) {
         Text("Цех", style = MaterialTheme.typography.headlineLarge)
         Text("Вход работника склада", style = MaterialTheme.typography.titleLarge)
         Text("Сервер: ${state.environment}", style = MaterialTheme.typography.bodySmall)
-        OutlinedTextField(value = state.environmentInput, onValueChange = { onIntent(AuthIntent.EnvironmentChanged(it)) },
-            label = { Text("Адрес сервера") }, singleLine = true, enabled = !state.busy && !state.restoring, modifier = Modifier.fillMaxWidth())
-        OutlinedButton(onClick = { onIntent(AuthIntent.ApplyEnvironment) }, enabled = !state.busy && !state.restoring) { Text("Применить адрес") }
+        var serverMenu by remember { mutableStateOf(false) }
+        Box(Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { serverMenu = true }, enabled = !state.busy && !state.restoring,
+                modifier = Modifier.fillMaxWidth().testTag("auth-server-selector")) { Text(state.serverOption.title) }
+            DropdownMenu(expanded = serverMenu, onDismissRequest = { serverMenu = false }) {
+                ServerOption.entries.forEach { option ->
+                    DropdownMenuItem(text = { Column { Text(option.title); option.baseUrl?.let { Text(it, style = MaterialTheme.typography.bodySmall) } } },
+                        modifier = Modifier.testTag("auth-server-${option.name.lowercase()}"),
+                        onClick = { serverMenu = false; onIntent(AuthIntent.ServerSelected(option)) })
+                }
+            }
+        }
+        if (state.serverOption == ServerOption.CUSTOM) {
+            OutlinedTextField(value = state.environmentInput, onValueChange = { onIntent(AuthIntent.EnvironmentChanged(it)) },
+                label = { Text("Адрес другого сервера") }, singleLine = true, enabled = !state.busy && !state.restoring,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false), modifier = Modifier.fillMaxWidth().testTag("auth-server-custom-url"))
+            OutlinedButton(onClick = { onIntent(AuthIntent.ApplyEnvironment) }, enabled = !state.busy && !state.restoring,
+                modifier = Modifier.testTag("auth-server-apply")) { Text("Применить адрес") }
+        }
         OutlinedTextField(value = state.login, onValueChange = { onIntent(AuthIntent.LoginChanged(it)) },
             label = { Text("Логин") }, singleLine = true, enabled = !state.busy && !state.restoring, modifier = Modifier.fillMaxWidth().testTag("auth-login"))
         OutlinedTextField(value = state.password, onValueChange = { onIntent(AuthIntent.PasswordChanged(it)) },
@@ -40,7 +56,7 @@ fun AuthScreen(state: AuthUiState, onIntent: (AuthIntent) -> Unit) {
         state.notice?.let { Text(it) }
         if (state.restoring) Text("Проверяем сохранённую сессию…")
         if (state.busy || state.restoring) LinearProgressIndicator(Modifier.fillMaxWidth())
-        Button(onClick = { onIntent(AuthIntent.LoginClick) }, enabled = !state.busy && !state.restoring, modifier = Modifier.fillMaxWidth().testTag("auth-submit")) { Text("Войти") }
+        Button(onClick = { onIntent(AuthIntent.LoginClick) }, enabled = !state.busy && !state.restoring && state.environmentApplied, modifier = Modifier.fillMaxWidth().testTag("auth-submit")) { Text("Войти") }
         TextButton(onClick = { onIntent(AuthIntent.RetryRestore) }, enabled = !state.busy && !state.restoring) { Text("Проверить сессию снова") }
     }
 }
