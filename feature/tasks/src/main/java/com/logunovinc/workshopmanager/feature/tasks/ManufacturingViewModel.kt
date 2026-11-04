@@ -18,7 +18,7 @@ data class PrototypeMaterialRow(val id: Long, val product: Product, val input: P
     val definition: StockDefinition? = null, val loading: Boolean = true, val error: AppError? = null)
 data class ManufacturingPreviewBinding(val command: ManufacturingCommand, val preview: ManufacturingPreview, val revision: Long)
 data class ManufacturingUiState(val loading: Boolean = true, val stale: Boolean = true, val task: Task? = null,
-    val output: ActualLineInput? = null, val materials: List<PrototypeMaterialRow> = emptyList(), val comment: String = "",
+    val output: ActualLineInput? = null, val materials: List<PrototypeMaterialRow> = emptyList(),
     val previewLoading: Boolean = false, val binding: ManufacturingPreviewBinding? = null, val reviewOpen: Boolean = false,
     val result: ExecutionResultState = ExecutionResultState.Idle, val pending: PendingCommand? = null, val error: AppError? = null,
     val catalogQuery: String = "", val catalog: List<Product> = emptyList(), val catalogLoading: Boolean = false,
@@ -32,7 +32,6 @@ enum class PrototypeMaterialField { QUANTITY, SHEETS, LENGTH, UNIT_NAME, UNIT_QU
 sealed interface ManufacturingIntent {
     data class OutputQuantityChanged(val value: String) : ManufacturingIntent
     data class OutputSheetsChanged(val value: String) : ManufacturingIntent
-    data class CommentChanged(val value: String) : ManufacturingIntent
     data class MaterialChanged(val rowId: Long, val field: PrototypeMaterialField, val value: String) : ManufacturingIntent
     data class AddMaterial(val product: Product) : ManufacturingIntent
     data class RemoveMaterial(val rowId: Long) : ManufacturingIntent
@@ -82,7 +81,6 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
         when (intent) {
             is ManufacturingIntent.OutputQuantityChanged -> if (current.editable) { invalidatePreview(); mutableState.update { it.copy(output = it.output?.copy(quantity = intent.value)) } }
             is ManufacturingIntent.OutputSheetsChanged -> if (current.editable) { invalidatePreview(); mutableState.update { it.copy(output = it.output?.copy(sheets = intent.value)) } }
-            is ManufacturingIntent.CommentChanged -> if (current.editable) { invalidatePreview(); mutableState.update { it.copy(comment = intent.value) } }
             is ManufacturingIntent.MaterialChanged -> if (current.editable && current.prototype) {
                 invalidatePreview()
                 mutableState.update { it.copy(materials = it.materials.map { row -> if (row.id != intent.rowId) row else row.copy(input = when (intent.field) {
@@ -137,10 +135,9 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
         if (!current.reviewOpen || current.loading || current.stale || current.pending != null || current.result == ExecutionResultState.Sending || binding.revision != revision || !binding.preview.canExecute) return
         val fresh = draft(current)?.let { prepare(task, it) }
         if (fresh !is Outcome.Success || fresh.value != binding.command) { invalidatePreview(); return }
-        val comment = current.comment
         mutableState.update { it.copy(result = ExecutionResultState.Sending) }
         viewModelScope.launch {
-            val result = execute(task, binding.command, binding.preview, comment)
+            val result = execute(task, binding.command, binding.preview, comment = "")
             mutableState.update { it.copy(result = result.executionState(), binding = null, reviewOpen = false) }
             when (result) {
                 is CommandOutcome.Confirmed -> refresh(reset = true)
@@ -161,8 +158,7 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
                     val prototype = task.value.production?.status == RecipeStatus.AWAITING_PROTOTYPE
                     state.copy(loading = false, stale = false, task = task.value,
                         output = output?.let { line -> if (!reset && state.output?.taskLineId == line.id) state.output else ActualLineInput(line.id) },
-                        materials = if (reset || !prototype) emptyList() else state.materials,
-                        comment = if (reset) "" else state.comment)
+                        materials = if (reset || !prototype) emptyList() else state.materials)
                 }
             }
         }

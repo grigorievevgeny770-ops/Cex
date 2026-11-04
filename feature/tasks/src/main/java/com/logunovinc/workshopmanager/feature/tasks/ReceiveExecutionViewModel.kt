@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 data class ReceiveExecutionUiState(
     val loading: Boolean = true, val stale: Boolean = true, val task: Task? = null,
-    val inputs: List<ActualLineInput> = emptyList(), val final: Boolean = false, val reason: String = "", val comment: String = "",
+    val inputs: List<ActualLineInput> = emptyList(), val final: Boolean = false, val reason: String = "",
     val review: ReceiveCommand? = null, val result: ExecutionResultState = ExecutionResultState.Idle,
     val pending: PendingCommand? = null, val error: AppError? = null,
 ) {
@@ -25,7 +25,6 @@ sealed interface ReceiveExecutionIntent {
     data class SheetsChanged(val lineId: Long, val raw: String) : ReceiveExecutionIntent
     data class FinalChanged(val value: Boolean) : ReceiveExecutionIntent
     data class ReasonChanged(val value: String) : ReceiveExecutionIntent
-    data class CommentChanged(val value: String) : ReceiveExecutionIntent
     data object ReviewClick : ReceiveExecutionIntent
     data object DismissReview : ReceiveExecutionIntent
     data object ConfirmClick : ReceiveExecutionIntent
@@ -50,7 +49,7 @@ class ReceiveExecutionViewModel @Inject constructor(savedStateHandle: SavedState
         } }
         refresh(resetInputs = true)
     }
-    private fun draft(state: ReceiveExecutionUiState) = ReceiveDraft(state.inputs, state.final, state.reason, state.comment)
+    private fun draft(state: ReceiveExecutionUiState) = ReceiveDraft(state.inputs, state.final, state.reason, comment = "")
     fun onIntent(intent: ReceiveExecutionIntent) {
         val current = uiState.value
         when (intent) {
@@ -58,7 +57,6 @@ class ReceiveExecutionViewModel @Inject constructor(savedStateHandle: SavedState
             is ReceiveExecutionIntent.SheetsChanged -> if (current.editable) mutableState.update { it.copy(inputs = it.inputs.map { input -> if (input.taskLineId == intent.lineId) input.copy(sheets = intent.raw) else input }, error = null) }
             is ReceiveExecutionIntent.FinalChanged -> if (current.editable) mutableState.update { it.copy(final = intent.value, error = null) }
             is ReceiveExecutionIntent.ReasonChanged -> if (current.editable) mutableState.update { it.copy(reason = intent.value, error = null) }
-            is ReceiveExecutionIntent.CommentChanged -> if (current.editable) mutableState.update { it.copy(comment = intent.value, error = null) }
             ReceiveExecutionIntent.ReviewClick -> if (current.editable) {
                 when (val result = prepare(current.task!!, draft(current))) {
                     is Outcome.Success -> mutableState.update { it.copy(review = result.value, error = null) }
@@ -95,7 +93,7 @@ class ReceiveExecutionViewModel @Inject constructor(savedStateHandle: SavedState
                 is Outcome.Success -> if (request == generation) mutableState.update { state ->
                     state.copy(loading = false, stale = false, task = task.value,
                         inputs = task.value.lines.map { line -> if (resetInputs) ActualLineInput(line.id) else state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id) },
-                        final = if (resetInputs && state.result is ExecutionResultState.Confirmed) false else state.final, reason = if (resetInputs) "" else state.reason, comment = if (resetInputs) "" else state.comment)
+                        final = if (resetInputs && state.result is ExecutionResultState.Confirmed) false else state.final, reason = if (resetInputs) "" else state.reason)
                 }
             }
         }

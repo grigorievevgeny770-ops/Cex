@@ -18,7 +18,9 @@ class JournalMapper(private val json: Json) {
     }
     fun confirmation(command: PendingCommandEntity): CommandConfirmation? = command.ackBody?.let { body ->
         val ack = json.decodeFromString<CommandAckDto>(body)
-        CommandConfirmation(command.id, ack.task.id, ack.task.version, ack.result.executionId, ack.result.duplicate)
+        CommandConfirmation(command.id, ack.task.id, ack.task.version, ack.result.executionId, ack.result.duplicate,
+            terminal = ack.task.isCompleted == true || ack.task.isClosedIncomplete ||
+                (ack.task.isCompleted == null && ack.task.isCancelled == null && ack.task.status == "completed"))
     }
     fun domain(command: PendingCommandEntity): PendingCommand {
         val summary = json.decodeFromString<SummaryRecord>(command.summary)

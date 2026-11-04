@@ -19,8 +19,9 @@ import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun DispatchExecutionRoute(viewModel: DispatchExecutionViewModel, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit) {
+fun DispatchExecutionRoute(viewModel: DispatchExecutionViewModel, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    CompletedTaskEffect((state.result as? ExecutionResultState.Confirmed)?.receipt, onCompleted)
     DispatchExecutionScreen(state, viewModel::onIntent, onRecoveryClick, onDetailClick)
 }
 @Composable
@@ -72,7 +73,6 @@ fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (Dispatch
                     line?.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
                 }
                 Text("Товар будет в пути до приёмки получателем")
-                if (review.comment.isNotBlank()) Text(review.comment)
             } },
             confirmButton = { Button(onClick = { onIntent(DispatchExecutionIntent.ConfirmClick) }, enabled = state.result != ExecutionResultState.Sending && state.pending == null) { Text("Подтвердить") } },
             dismissButton = { TextButton(onClick = { onIntent(DispatchExecutionIntent.DismissReview) }, enabled = state.result != ExecutionResultState.Sending) { Text("Изменить") } })

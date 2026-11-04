@@ -85,6 +85,7 @@ class RealBackendConnectedTest {
         click("task-list",hasTestTag("task-card-${task(key).getValue("id").jsonPrimitive.long}"))
     }
     private fun home() { compose.onNodeWithTag("nav-stock").performClick(); waitText("Склад цеха"); compose.onNodeWithTag("nav-tasks").performClick() }
+    private fun waitForTasks(completedId: Long) { compose.waitUntil(20_000) { compose.onAllNodesWithTag("task-list").fetchSemanticsNodes().isNotEmpty() && compose.onAllNodesWithTag("task-card-$completedId").fetchSemanticsNodes().isEmpty() } }
     private fun confirmed(list: String) {
         compose.waitUntil(20_000) {
             try { compose.onNodeWithTag(list).performScrollToNode(hasText("Готово",substring=true));true } catch (_: AssertionError) { false }
@@ -100,7 +101,7 @@ class RealBackendConnectedTest {
             compose.onNodeWithText("Причина недостачи, если она есть").performTextInput("Одна единица не прибыла")
         }
         tagged("receive-list", "receive-review"); waitText(if(final) "Завершить приёмку?" else "Принять эту часть?")
-        compose.onNodeWithTag("receive-confirm").performClick();confirmed("receive-list")
+        compose.onNodeWithTag("receive-confirm").performClick();if(final) waitForTasks(task("receive").getValue("id").jsonPrimitive.long) else confirmed("receive-list")
     }
     private fun manufacture(key: String, prototype: Boolean) {
         open(key,"Изготовление");tagged("task-detail-list","task-manufacturing")
@@ -123,7 +124,7 @@ class RealBackendConnectedTest {
         home();manufacture("fixed",false);manufacture("prototype",true)
         open("dispatch","Отправка");click("task-detail-list",hasText("Отправить товары"))
         click("dispatch-list",hasText("Отправить сейчас, шт"));compose.onNodeWithText("Отправить сейчас, шт").performTextInput("3")
-        click("dispatch-list",hasText("Отправить"));waitText("Подтвердить отправку?");compose.onNodeWithText("Подтвердить",substring=false).performClick();confirmed("dispatch-list")
+        click("dispatch-list",hasText("Отправить"));waitText("Подтвердить отправку?");compose.onNodeWithText("Подтвердить",substring=false).performClick();waitForTasks(task("dispatch").getValue("id").jsonPrimitive.long)
         home();compose.onNodeWithTag("nav-stock").performClick();waitText("На складе: 43 шт")
     }
 }

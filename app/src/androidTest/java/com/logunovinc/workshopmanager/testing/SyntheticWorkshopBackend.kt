@@ -31,6 +31,9 @@ class SyntheticWorkshopBackend : AutoCloseable {
     val manufacturingExecutions = AtomicInteger()
     val previews = AtomicInteger()
     val stockReads = AtomicInteger()
+    val taskListReads = AtomicInteger()
+    @Volatile var ackBodyDelayMillis = 0L
+    @Volatile var failReceiveOnce = false
     @Volatile var lastManufacturingBody = ""
     @Volatile var receiveFinal = false
     val receiveBodies = java.util.Collections.synchronizedList(mutableListOf<String>())
@@ -56,13 +59,19 @@ class SyntheticWorkshopBackend : AutoCloseable {
                         return response("""{"code":"DOCUMENT_STATE_CONFLICT","message":"Другой сотрудник изменил задание"}""",409)
                     }
                     closes.incrementAndGet();closeClosed=true;closeVersion++
-                    return response("""{"result":{"id":101,"version":3,"duplicate":false},"task":${task()}}""")
+                    return response("""{"result":{"id":101,"version":3,"duplicate":false},"task":${task()}}""").setBodyDelay(ackBodyDelayMillis,java.util.concurrent.TimeUnit.MILLISECONDS)
                 }
                 if (path == "/api/warehouses") return response("""[{"id":7,"name":"Основной","code":"main","is_active":true},{"id":42,"name":"Цех","code":"workshop","is_active":true}]""")
-                if (path == "/api/workshop/tasks") return response(page(task()))
+                if (path == "/api/workshop/tasks") {
+                    taskListReads.incrementAndGet()
+                    val terminal=closeClosed || receiveFinal
+                    val view=request.requestUrl!!.queryParameter("view")
+                    return response(if ((view=="active" && terminal) || (view=="history" && !terminal)) page("",0) else page(task()))
+                }
                 if (path == "/api/workshop/tasks/101") return response(task())
                 if (path == "/api/workshop/tasks/101/start") { starts.incrementAndGet(); return response("""{"code":"TEST_ERROR","message":"Smoke must not automatically start"}""", 409) }
                 if (path == "/api/workshop/tasks/101/executions" && request.method == "POST") {
+                    if(failReceiveOnce) { failReceiveOnce=false;return response("""{"code":"INTERNAL_ERROR","message":"Unknown result"}""",500) }
                     val rawBody=request.body.readUtf8();receiveBodies += rawBody
                     val body = Json.parseToJsonElement(rawBody).jsonObject
                     val token = body["client_token"]!!.jsonPrimitive.content
@@ -73,7 +82,7 @@ class SyntheticWorkshopBackend : AutoCloseable {
                     version++
                     val ack = """{"result":{"id":101,"execution_id":5001,"duplicate":false},"task":${task()}}"""
                     receipts[token] = ack
-                    return response(ack)
+                    return response(ack).setBodyDelay(ackBodyDelayMillis,java.util.concurrent.TimeUnit.MILLISECONDS)
                 }
                 if (path == "/api/workshop/tasks/101/executions") return response(if (accepted == 0) page("", 0) else page("""{"id":5001,"task_id":101,"executed_by":42,"executed_at":"2026-11-01T12:02:00Z","comment":"Synthetic received","final":false,"lines":[{"task_line_id":1001,"product_id":301,"role":"receive","actual_qty":"4"}]}"""))
                 if (path == "/api/workshop/tasks/101/history") return response(if (accepted == 0) page("", 0) else page("""{"id":6001,"event_type":"executed","actor_id":42,"created_at":"2026-11-01T12:02:00Z","details":{"execution_id":5001}}"""))

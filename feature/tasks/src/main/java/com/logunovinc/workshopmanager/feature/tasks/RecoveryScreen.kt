@@ -12,8 +12,9 @@ import com.logunovinc.workshopmanager.core.ui.localDate
 import com.logunovinc.workshopmanager.domain.pending.*
 
 @Composable
-fun RecoveryRoute(viewModel: RecoveryViewModel, onTaskClick: (Long) -> Unit) {
+fun RecoveryRoute(viewModel: RecoveryViewModel, onTaskClick: (Long) -> Unit, onCompleted: (CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    CompletedTaskEffect(state.lastConfirmation, onCompleted)
     RecoveryScreen(state, viewModel::onIntent, onTaskClick)
 }
 @Composable

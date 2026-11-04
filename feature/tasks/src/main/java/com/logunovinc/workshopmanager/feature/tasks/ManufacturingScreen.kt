@@ -19,8 +19,9 @@ import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
 import com.logunovinc.workshopmanager.domain.production.*
 
 @Composable
-fun ManufacturingRoute(viewModel: ManufacturingViewModel, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit) {
+fun ManufacturingRoute(viewModel: ManufacturingViewModel, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    CompletedTaskEffect((state.result as? ExecutionResultState.Confirmed)?.receipt, onCompleted)
     ManufacturingScreen(state, viewModel::onIntent, onRecoveryClick, onDetailClick)
 }
 @Composable
@@ -87,7 +88,6 @@ fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingInt
             text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ManufacturingPreviewSummary(preview)
                 Text(if (state.prototype) "Первый выпуск входит в план" else "Материалы будут списаны, изделие добавится на склад")
-                if (state.comment.isNotBlank()) Text(state.comment)
             } },
             confirmButton = { Button(onClick = { onIntent(ManufacturingIntent.ConfirmClick) }, modifier = Modifier.testTag("manufacturing-confirm"), enabled = state.result != ExecutionResultState.Sending && state.pending == null) { Text("Подтвердить") } },
             dismissButton = { TextButton(onClick = { onIntent(ManufacturingIntent.DismissReview) }, enabled = state.result != ExecutionResultState.Sending) { Text("Назад") } })

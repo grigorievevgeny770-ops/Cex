@@ -21,8 +21,9 @@ import com.logunovinc.workshopmanager.core.ui.*
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    CompletedTaskEffect(state.lastConfirmation, onCompleted)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(viewModel, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {

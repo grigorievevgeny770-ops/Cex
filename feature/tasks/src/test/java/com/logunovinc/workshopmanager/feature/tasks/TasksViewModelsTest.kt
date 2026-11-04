@@ -280,4 +280,20 @@ class TasksViewModelsTest {
         assertTrue(vm.uiState.value.task!!.isClosedIncomplete);assertFalse(vm.uiState.value.closeAvailable);assertFalse(vm.uiState.value.executionAvailable);assertEquals(1,tasks.closeCalls)
     }
 
+    @Test fun completedCommandForcesFreshCurrentFilterCancelsOlderPageAndIsConsumedOnce() = runTest(dispatcher) {
+        val tasks=Tasks();val gate=CompletableDeferred<Unit>()
+        val filters=mutableListOf<TaskFilter>()
+        tasks.listing={ filter,_ ->
+            filters+=filter
+            if(filters.size==1) withContext(NonCancellable) { gate.await();Outcome.Success(Page(listOf(sampleTask(1)),1,50,0)) }
+            else Outcome.Success(Page(listOf(sampleTask(2)),1,50,0))
+        }
+        val vm=TaskListViewModel(ResolveWorkshopUseCase(Warehouses()),LoadTasksUseCase(tasks));runCurrent()
+        vm.onIntent(TaskListIntent.Completed("terminal-ack"));runCurrent()
+        assertEquals(listOf(2L),vm.uiState.value.items.map(Task::id))
+        gate.complete(Unit);runCurrent();assertEquals(listOf(2L),vm.uiState.value.items.map(Task::id))
+        vm.onIntent(TaskListIntent.Completed("terminal-ack"));runCurrent();assertEquals(2,tasks.reads)
+        assertTrue(filters.all { it==TaskFilter() })
+    }
+
 }

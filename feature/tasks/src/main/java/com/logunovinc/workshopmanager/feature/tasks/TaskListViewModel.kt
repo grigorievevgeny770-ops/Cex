@@ -18,6 +18,7 @@ data class TaskListUiState(
     val hasMore: Boolean = false, val error: AppError? = null,
 )
 sealed interface TaskListIntent {
+    data class Completed(val commandId: String) : TaskListIntent
     data object Refresh : TaskListIntent
     data object Poll : TaskListIntent
     data object LoadMore : TaskListIntent
@@ -27,11 +28,17 @@ sealed interface TaskListIntent {
 class TaskListViewModel @Inject constructor(private val resolve: ResolveWorkshopUseCase, private val loadTasks: LoadTasksUseCase) : ViewModel() {
     private val mutableState = MutableStateFlow(TaskListUiState())
     val uiState = mutableState.asStateFlow()
+    private var lastCompletedCommandId: String? = null
     private var generation = 0L
     private var job: Job? = null
     init { refresh() }
     fun onIntent(intent: TaskListIntent) {
         when (intent) {
+            is TaskListIntent.Completed -> {
+                if (lastCompletedCommandId == intent.commandId) return
+                lastCompletedCommandId = intent.commandId
+                refresh()
+            }
             TaskListIntent.Refresh -> refresh()
             TaskListIntent.Poll -> if (!uiState.value.loading && !uiState.value.refreshing && !uiState.value.loadingMore) refresh()
             TaskListIntent.LoadMore -> loadMore()

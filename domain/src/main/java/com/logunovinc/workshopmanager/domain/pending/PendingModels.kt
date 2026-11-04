@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 enum class PendingState { PREPARED, IN_FLIGHT, UNKNOWN, NEEDS_REVIEW, ACKNOWLEDGED, REJECTED }
 /** Exact human-readable quantities, line names and comment; never a raw HTTP payload. */
 data class CommandSummary(val title: String, val lines: List<String>, val comment: String = "")
-data class CommandConfirmation(val commandId: String, val taskId: Long, val taskVersion: Long, val executionId: Long?, val duplicate: Boolean)
+data class CommandConfirmation(val commandId: String, val taskId: Long, val taskVersion: Long, val executionId: Long?, val duplicate: Boolean, val terminal: Boolean = false)
 data class PendingCommand(
     val id: String, val taskId: Long, val action: String, val summary: CommandSummary,
     val state: PendingState, val createdAt: Instant, val attempts: Int,

@@ -6,7 +6,7 @@
 
 `app/build/outputs/apk/debug/app-debug.apk` — 14 810 437 байт.
 
-SHA256: `87f54d1dff7364a903bb631500def20c998370d20bfcfba7c125d5a80205f9cc`.
+SHA256: `d028f1c21077333945856f9330b76a0683551a344b28c7e4ee429e4827821746`.
 
 APK установлен и запущен на emulator-5554/API37. Debug/release default: `https://147-45-154-211.sslip.io/` (saved environment takes precedence). SDK/JDK и настройка окружений — в README.md.
 
@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 131 JVM-тест, 9 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 135 JVM-тестов, 11 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -121,3 +121,12 @@ Domain/data HTTP/DTO/command payloads не менялись. Журнал хра
 Проверки: 131unit/9connected, failures/errors/skips=0, lint/assembleDebug (CONNECTED_TESTS=1 scripts/verify.sh, /tmp/tseh-simple-ui-final-verify6.log). Независимый root scripts/verify.sh: /tmp/tseh-simple-ui-root-verify.log PASS. Actual backend Compose baseline: /tmp/tseh-simple-ui-real-baseline/result.json PASS, backend d67be7c5d5ee5e60af5ff7399469c8e91c64747c; receive4+5final/shortage1, fixed3/6, prototype2/4→3/6, dispatch3 in transit, exact fact proofs and stock43/0/5. Все движения только в owned fixture DB. Финальные снимки /tmp/tseh-simple-ui-final-screens визуально проверены супервизором.
 
 Actual process-death UI proof: /tmp/tseh-simple-ui-process-recovery3/result.json PASS. PID21069→21477, one physical fact, identical body/token, no replay on launch; safe manual retry returned ACK. Separate .processfixture package, synthetic loopback server only. Root visually reviewed recovery unknown-outcome screen. Fixture harness fixes remove unnecessary reverse DNS and wait for IME before coordinate selection; application semantics unchanged.
+
+## 2026-11-04 — завершение с автоматическим возвратом
+Необязательный комментарий удалён из UiState/intents и подтверждений новых receive/dispatch/manufacture форм; обязательные причины сохранены. Domain/API comment остаётся совместимым пустым для новых команд, исторические/pending комментарии не переписываются.
+
+После durable ACK текущего task.is_completed или is_closed_incomplete route возвращается к существующему списку. CommandId обрабатывается один раз при RESUMED; список принудительно перечитывается с текущим фильтром, старый незавершённый GET отменяется/отбрасывается по generation. Частичный факт, preview, простое открытие закрытой карточки, ошибка/unknown и неудачное локальное сохранение ACK не вызывают перехода. Исторический result не подменяет текущий task из ACK. Явный retry подтверждённого завершения работает так же.
+
+135unit/11connected,0 failures/errors/skips; lint/assembleDebug: /tmp/tseh-terminal-ack-final-verify3.log. Root independently ran scripts/verify.sh: /tmp/tseh-terminal-ack-root-verify.log PASS and re-counted XML135/11. UI: delayed ACK leaves page until body received, exactly one list reload after completion; background ACK consumed on resume, rotation no duplicate command/navigation; 500 unknown stays. Room ACK-save failure remains unresolved and exact retry recovers terminal receipt.
+
+Actual backend baseline /tmp/tseh-terminal-ack-real-baseline/result.json PASS (terminal receive/full dispatch return, partial fixed/prototype stay,6 facts/stock43/0/5). Actual close5 /tmp/tseh-terminal-ack-real-close2/result.json PASS (all5return/freshlist/cardgone; history card stays, accounting unchanged/stock30/3/2). These writes use owned synthetic SQLite fixtures only; shared database is untouched.

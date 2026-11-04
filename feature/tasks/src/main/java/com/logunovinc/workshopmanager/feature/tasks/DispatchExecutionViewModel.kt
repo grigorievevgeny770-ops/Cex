@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 data class DispatchExecutionUiState(
     val loading: Boolean = true, val stale: Boolean = true, val task: Task? = null,
-    val inputs: List<ActualLineInput> = emptyList(), val comment: String = "",
+    val inputs: List<ActualLineInput> = emptyList(),
     val review: DispatchCommand? = null, val result: ExecutionResultState = ExecutionResultState.Idle,
     val pending: PendingCommand? = null, val error: AppError? = null,
 ) {
@@ -23,7 +23,6 @@ data class DispatchExecutionUiState(
 sealed interface DispatchExecutionIntent {
     data class QuantityChanged(val lineId: Long, val raw: String) : DispatchExecutionIntent
     data class SheetsChanged(val lineId: Long, val raw: String) : DispatchExecutionIntent
-    data class CommentChanged(val value: String) : DispatchExecutionIntent
     data object ReviewClick : DispatchExecutionIntent
     data object DismissReview : DispatchExecutionIntent
     data object ConfirmClick : DispatchExecutionIntent
@@ -48,13 +47,12 @@ class DispatchExecutionViewModel @Inject constructor(savedStateHandle: SavedStat
         } }
         refresh(resetInputs = true)
     }
-    private fun draft(state: DispatchExecutionUiState) = DispatchDraft(state.inputs, state.comment)
+    private fun draft(state: DispatchExecutionUiState) = DispatchDraft(state.inputs, comment = "")
     fun onIntent(intent: DispatchExecutionIntent) {
         val current = uiState.value
         when (intent) {
             is DispatchExecutionIntent.QuantityChanged -> if (current.editable) mutableState.update { it.copy(inputs = it.inputs.map { input -> if (input.taskLineId == intent.lineId) input.copy(quantity = intent.raw) else input }, error = null) }
             is DispatchExecutionIntent.SheetsChanged -> if (current.editable) mutableState.update { it.copy(inputs = it.inputs.map { input -> if (input.taskLineId == intent.lineId) input.copy(sheets = intent.raw) else input }, error = null) }
-            is DispatchExecutionIntent.CommentChanged -> if (current.editable) mutableState.update { it.copy(comment = intent.value, error = null) }
             DispatchExecutionIntent.ReviewClick -> if (current.editable) {
                 when (val result = prepare(current.task!!, draft(current))) {
                     is Outcome.Success -> mutableState.update { it.copy(review = result.value, error = null) }
@@ -90,8 +88,7 @@ class DispatchExecutionViewModel @Inject constructor(savedStateHandle: SavedStat
                 is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, error = task.error) }
                 is Outcome.Success -> if (request == generation) mutableState.update { state ->
                     state.copy(loading = false, stale = false, task = task.value,
-                        inputs = task.value.lines.map { line -> if (resetInputs) ActualLineInput(line.id) else state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id) },
-                        comment = if (resetInputs) "" else state.comment)
+                        inputs = task.value.lines.map { line -> if (resetInputs) ActualLineInput(line.id) else state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id) })
                 }
             }
         }

@@ -20,12 +20,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 @Composable
-fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, onRecoveryClick: () -> Unit, consumeCompletion: () -> String? = { null }) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val completion by rememberUpdatedState(consumeCompletion)
     LaunchedEffect(viewModel, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            viewModel.onIntent(TaskListIntent.Poll)
+            val commandId = completion()
+            if (commandId != null) viewModel.onIntent(TaskListIntent.Completed(commandId)) else viewModel.onIntent(TaskListIntent.Poll)
             while (isActive) { delay(30_000); viewModel.onIntent(TaskListIntent.Poll) }
         }
     }

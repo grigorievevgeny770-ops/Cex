@@ -139,14 +139,34 @@ class WorkshopConnectedSmokeTest {
         compose.onNodeWithTag("receive-list").performScrollToNode(hasText("Причина недостачи, если она есть"));compose.onNodeWithText("Причина недостачи, если она есть").performTextInput("Остальная часть не прибыла")
         clickInList("receive-list","receive-review");waitText("Завершить приёмку?")
         waitText("ранее принято 4 · остаток до этого шага 6",true)
-        assertEquals(1,backend.backend.executions.get());compose.onNodeWithTag("receive-confirm").performClick()
+        assertEquals(1,backend.backend.executions.get())
+        val readsBefore=backend.backend.taskListReads.get()
+        backend.backend.ackBodyDelayMillis=3000
+        compose.onNodeWithTag("receive-confirm").performClick()
         compose.waitUntil(15_000) { backend.backend.executions.get()==2 }
-        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Приёмка завершена. Недостачу",true)
+        compose.onNodeWithTag("receive-list").assertIsDisplayed()
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-list").fetchSemanticsNodes().isNotEmpty() && compose.onAllNodesWithTag("task-card-101").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("task-card-101").assertDoesNotExist()
+        assertEquals(readsBefore+1,backend.backend.taskListReads.get())
+        compose.activityRule.scenario.recreate();compose.waitForIdle()
+        compose.onNodeWithTag("task-list").assertIsDisplayed()
         val payload=Json.parseToJsonElement(backend.backend.receiveBodies.last()).jsonObject
         assertEquals("RECEIVE_GOODS",payload["type"]!!.jsonPrimitive.content);assertTrue(payload["final"]!!.jsonPrimitive.boolean)
         assertTrue(payload["lines"]!!.jsonArray.isEmpty());assertEquals(3L,payload["expected_transfer_version"]!!.jsonPrimitive.long)
         assertEquals("Остальная часть не прибыла",payload["reason"]!!.jsonPrimitive.content)
         assertEquals(0,backend.backend.closeAttempts.get());assertEquals(0,backend.backend.starts.get())
+    }
+
+    @Test fun unknownReceiveOutcomeDoesNotCloseExecutionPage() {
+        backend.backend.failReceiveOnce=true
+        login();compose.onNodeWithTag("task-card-101").performScrollTo().performClick()
+        clickInList("task-detail-list","task-receive")
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("receive-qty-1001").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("receive-list").performScrollToNode(hasTestTag("receive-qty-1001"));compose.onNodeWithTag("receive-qty-1001").performTextInput("4")
+        clickInList("receive-list","receive-review");waitText("Принять эту часть?");compose.onNodeWithTag("receive-confirm").performClick()
+        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Исход неизвестен",true)
+        compose.onNodeWithTag("receive-list").assertIsDisplayed();compose.onNodeWithTag("task-list").assertDoesNotExist()
+        assertEquals(0,backend.backend.executions.get())
     }
 
 }

@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.navigation.compose.*
 import com.logunovinc.workshopmanager.core.ui.WorkshopTheme
+import com.logunovinc.workshopmanager.domain.pending.CommandConfirmation
 import com.logunovinc.workshopmanager.feature.auth.AuthRoute
 import com.logunovinc.workshopmanager.feature.auth.AuthViewModel
 import com.logunovinc.workshopmanager.feature.tasks.*
@@ -37,6 +38,11 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val route = entry?.destination?.route
+    val completed: (CommandConfirmation) -> Unit = { receipt ->
+        val tasks = navController.getBackStackEntry("tasks")
+        tasks.savedStateHandle["completedCommandId"] = receipt.commandId
+        navController.popBackStack("tasks", false)
+    }
     Scaffold(topBar = { TopAppBar(title = { Text("Цех") }, navigationIcon = {
         if (route != "tasks" && route != "stock") TextButton(onClick = { navController.popBackStack() }) { Text("Назад") }
     }, actions = { TextButton(onClick = onLogout) { Text("Выйти") } }) }, bottomBar = {
@@ -49,29 +55,29 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
         }
     }) { padding ->
         NavHost(navController, startDestination = "tasks", modifier = Modifier.padding(padding)) {
-            composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, { navController.navigate("recovery") }) }
+            composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, { navController.navigate("recovery") }, consumeCompletion = { entry.savedStateHandle.remove<String>("completedCommandId") }) }
             composable("task/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }, { navController.navigate("manufacturing/$it") }, { navController.navigate("receive/$it?final=true") }) { navController.navigate("recovery") }
+                TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }, { navController.navigate("manufacturing/$it") }, { navController.navigate("receive/$it?final=true") }, onRecoveryClick = { navController.navigate("recovery") }, onCompleted = completed)
             }
             composable("receive/{taskId}?final={final}", arguments = listOf(navArgument("taskId") { type = NavType.LongType }, navArgument("final") { type = NavType.BoolType; defaultValue = false })) { entry ->
                 val taskId = entry.arguments?.getLong("taskId") ?: return@composable
                 ReceiveExecutionRoute(hiltViewModel(entry), { navController.navigate("recovery") }, {
                     navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
-                })
+                }, onCompleted = completed)
             }
             composable("dispatch/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
                 val taskId = entry.arguments?.getLong("taskId") ?: return@composable
                 DispatchExecutionRoute(hiltViewModel(entry), { navController.navigate("recovery") }, {
                     navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
-                })
+                }, onCompleted = completed)
             }
             composable("manufacturing/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
                 val taskId = entry.arguments?.getLong("taskId") ?: return@composable
                 ManufacturingRoute(hiltViewModel(entry), { navController.navigate("recovery") }, {
                     navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
-                })
+                }, onCompleted = completed)
             }
-            composable("recovery") { entry -> RecoveryRoute(hiltViewModel(entry)) { navController.navigate("task/$it") } }
+            composable("recovery") { entry -> RecoveryRoute(hiltViewModel(entry), onTaskClick = { navController.navigate("task/$it") }, onCompleted = completed) }
             composable("stock") { entry -> StockListRoute(hiltViewModel(entry)) { navController.navigate("stock-item/$it") } }
             composable("stock-item/{productId}", arguments = listOf(navArgument("productId") { type = NavType.LongType })) { entry -> StockDetailRoute(hiltViewModel(entry)) }
         }

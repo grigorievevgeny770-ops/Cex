@@ -98,12 +98,14 @@ class CommandDispatcherTest {
             }
         }
         val bodies = mutableListOf<ByteArray>()
-        val dispatcher = dispatcher(sender { bodies += it.body.copyOf(); RawCommandResponse(200, "application/json", ack) }, journal)
+        val dispatcher = dispatcher(sender { bodies += it.body.copyOf(); RawCommandResponse(200, "application/json", ack.replace("partially_completed","completed")) }, journal)
         val unknown = submit(dispatcher) as CommandOutcome.Unresolved
         assertTrue(unknown.error.message.contains("Сервер подтвердил"))
         assertEquals(5001L, unknown.command.knownExecutionId)
         assertNotNull(database.commands().active("https://example.com/", 42, 101))
-        assertTrue(dispatcher.retry(unknown.command.id) is CommandOutcome.Confirmed)
+        assertNull(unknown.command.confirmation)
+        val recovered = dispatcher.retry(unknown.command.id) as CommandOutcome.Confirmed
+        assertTrue(recovered.confirmation.terminal)
         assertArrayEquals(bodies[0], bodies[1])
     }
     @Test fun initial403ReleasesSlotAndNewExplicitIntentCanSucceedAfterRightsRestore() = runBlocking {

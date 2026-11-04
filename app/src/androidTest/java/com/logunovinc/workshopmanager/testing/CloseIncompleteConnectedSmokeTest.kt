@@ -30,7 +30,8 @@ class CloseIncompleteConnectedSmokeTest {
     }
     private fun reason(value:String) { compose.onNodeWithTag("close-incomplete-reason").performScrollTo().performTextReplacement(value) }
     private fun confirmed() {
-        compose.waitUntil(15_000) { try { compose.onNodeWithTag("task-detail-list").performScrollToNode(hasText("Закрыта без полного выполнения"));true } catch (_:AssertionError) { false } }
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-list").fetchSemanticsNodes().isNotEmpty() && compose.onAllNodesWithTag("task-card-101").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("task-card-101").assertDoesNotExist()
     }
     @Test fun cancelBlankWhitespaceOversizedAndDoubleTapCannotCreateExtraCommand() {
         openTask();dialog();reason("Не отправлять")
@@ -61,4 +62,18 @@ class CloseIncompleteConnectedSmokeTest {
         assertEquals(3,bodies[0]["expected_version"]!!.jsonPrimitive.int);assertEquals(4,bodies[1]["expected_version"]!!.jsonPrimitive.int)
         assertNotEquals(bodies[0]["client_token"],bodies[1]["client_token"])
     }
+    @Test fun terminalAckReceivedInBackgroundReturnsOnceWhenScreenResumes() {
+        backend.backend.ackBodyDelayMillis=2000
+        openTask();dialog();reason("Причина UI")
+        val reads=backend.backend.taskListReads.get()
+        compose.onNodeWithTag("close-incomplete-confirm").performClick()
+        compose.waitUntil(10_000) { backend.backend.closes.get()==1 }
+        compose.onNodeWithTag("task-detail-list").assertIsDisplayed()
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        android.os.SystemClock.sleep(2300)
+        assertEquals(reads,backend.backend.taskListReads.get())
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        confirmed();assertEquals(reads+1,backend.backend.taskListReads.get())
+    }
+
 }

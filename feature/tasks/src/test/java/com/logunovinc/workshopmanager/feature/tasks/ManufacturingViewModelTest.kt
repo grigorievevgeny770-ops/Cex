@@ -78,7 +78,7 @@ class ManufacturingViewModelTest {
         assertEquals(BigDecimal("4"), vm.uiState.value.binding!!.command.output.quantity)
         old.complete(Unit); runCurrent()
         assertEquals(BigDecimal("4"), vm.uiState.value.binding!!.command.output.quantity)
-        vm.onIntent(ManufacturingIntent.CommentChanged("Новый комментарий"))
+        vm.onIntent(ManufacturingIntent.OutputQuantityChanged("5"))
         assertNull(vm.uiState.value.binding)
         vm.onIntent(ManufacturingIntent.ReviewClick); vm.onIntent(ManufacturingIntent.ConfirmClick)
         runCurrent()

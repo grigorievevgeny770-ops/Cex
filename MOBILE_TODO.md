@@ -28,3 +28,7 @@
 ## Дополнение: минимальный рабочий UI
 - [x] Audit/упрощение Auth, TaskList/Detail, Receive/Dispatch/Manufacture, Stock и Recovery.
 - [x] Regression unit/Compose + actual backend UI fixture, visual screenshots, APK и локальный commit.
+
+## Дополнение: завершение рабочего действия
+- [x] Удалён необязательный comment из presentation новых форм.
+- [x] Возврат после server-confirmed terminal ACK, принудительное обновление списка; проверки и APK/commit.

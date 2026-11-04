@@ -19,8 +19,9 @@ import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun ReceiveExecutionRoute(viewModel: ReceiveExecutionViewModel, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit) {
+fun ReceiveExecutionRoute(viewModel: ReceiveExecutionViewModel, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    CompletedTaskEffect((state.result as? ExecutionResultState.Confirmed)?.receipt, onCompleted)
     ReceiveExecutionScreen(state, viewModel::onIntent, onRecoveryClick, onDetailClick)
 }
 @Composable
@@ -83,7 +84,6 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
                 }
                 if (review.final && review.shortage) Text("Остальное станет недостачей. Потерю это не утверждает. Причина: ${review.reason}")
                 else if (!review.final) Text("Остальное продолжим ждать")
-                if (review.comment.isNotBlank()) Text(review.comment)
             } },
             confirmButton = { Button(onClick = { onIntent(ReceiveExecutionIntent.ConfirmClick) }, modifier = Modifier.testTag("receive-confirm"), enabled = state.result != ExecutionResultState.Sending && state.pending == null) { Text("Подтвердить") } },
             dismissButton = { TextButton(onClick = { onIntent(ReceiveExecutionIntent.DismissReview) }, enabled = state.result != ExecutionResultState.Sending) { Text("Изменить") } })

@@ -38,8 +38,7 @@ class RealCloseIncompleteConnectedTest {
     private fun tag(list:String,tag:String)=click(list,hasTestTag(tag))
     private fun task(key:String)=scenario.getValue(key).jsonObject
     private fun open(key:String,type:String) {
-        val title="№${task(key).getValue("id").jsonPrimitive.long} · $type"
-        click("task-list",hasText(title))
+        click("task-list",hasTestTag("task-card-${task(key).getValue("id").jsonPrimitive.long}"))
     }
     private fun home() { compose.onNodeWithTag("nav-stock").performClick();waitText("Склад цеха");compose.onNodeWithTag("nav-tasks").performClick() }
     private fun accounting():JsonElement {
@@ -51,13 +50,10 @@ class RealCloseIncompleteConnectedTest {
         tag("task-detail-list","task-close-incomplete");waitText("Завершить без полного выполнения?")
         compose.onNodeWithTag("close-incomplete-reason").performScrollTo().performTextInput("Закрытие UI $key")
         compose.onNodeWithTag("close-incomplete-confirm").performClick()
-        scroll("task-detail-list",hasText("Закрыта без полного выполнения"))
+        compose.waitUntil(20_000) { compose.onAllNodesWithTag("task-list").fetchSemanticsNodes().isNotEmpty() && compose.onAllNodesWithTag("task-card-${task(key).getValue("id").jsonPrimitive.long}").fetchSemanticsNodes().isEmpty() }
         val after=accounting();assertEquals("Closing $key must not create physical effects",before,after)
         proofs[key]=buildJsonObject { put("before",before);put("after",after) }
-        compose.onNodeWithTag("task-close-incomplete").assertDoesNotExist()
-        compose.onAllNodesWithText("Изготовить изделие").assertCountEquals(0)
-        compose.onAllNodesWithText("Отправить товары").assertCountEquals(0)
-        home()
+        compose.onNodeWithTag("task-card-${task(key).getValue("id").jsonPrimitive.long}").assertDoesNotExist()
     }
     private fun produce(key:String,prototype:Boolean) {
         open(key,"Изготовление");tag("task-detail-list","task-manufacturing")
@@ -91,8 +87,7 @@ class RealCloseIncompleteConnectedTest {
         waitText("Закрыта без полного выполнения")
         for(key in listOf("dispatch","dispatchZero","fixed","prototypeZero","prototype")) {
             val type=if(key.startsWith("dispatch")) "Отправка" else "Изготовление"
-            val title="№${task(key).getValue("id").jsonPrimitive.long} · $type"
-            click("task-list",hasText(title))
+                click("task-list",hasTestTag("task-card-${task(key).getValue("id").jsonPrimitive.long}"))
             scroll("task-detail-list",hasText("Причина: Закрытие UI $key"))
             compose.onNodeWithTag("task-close-incomplete").assertDoesNotExist()
             compose.onNodeWithText("Назад",substring=false).performClick()

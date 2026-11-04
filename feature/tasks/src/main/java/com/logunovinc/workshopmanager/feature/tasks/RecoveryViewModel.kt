@@ -8,7 +8,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class RecoveryUiState(val commands: List<PendingCommand> = emptyList(), val retrying: Set<String> = emptySet(), val message: String? = null)
+data class RecoveryUiState(val commands: List<PendingCommand> = emptyList(), val retrying: Set<String> = emptySet(), val message: String? = null, val lastConfirmation: CommandConfirmation? = null)
 sealed interface RecoveryIntent { data class Retry(val id: String) : RecoveryIntent }
 @HiltViewModel
 class RecoveryViewModel @Inject constructor(repository: PendingCommandRepository, private val retry: RetryPendingCommandUseCase) : ViewModel() {
@@ -23,7 +23,7 @@ class RecoveryViewModel @Inject constructor(repository: PendingCommandRepository
                 viewModelScope.launch {
                     try {
                         val outcome = retry(intent.id)
-                        mutableState.update { it.copy(message = when (outcome) {
+                        mutableState.update { it.copy(lastConfirmation = (outcome as? CommandOutcome.Confirmed)?.confirmation, message = when (outcome) {
                             is CommandOutcome.Confirmed -> "Действие подтверждено сервером"
                             is CommandOutcome.Unresolved -> "Исход неизвестен: ${outcome.error.operationalMessage()}"
                             is CommandOutcome.Rejected -> outcome.error.operationalMessage()

@@ -55,3 +55,6 @@ RECEIVE remains excluded from close-incomplete. The detail finalization button o
 
 ## 2026-11-04 — presentation simplification
 Normal UI no longer renders transport IDs/versions/documents or raw journal labels. This does not remove or rewrite any task/recipe version, command token, payload, actor/server isolation, ACK or quantities in storage/HTTP. UI quantities/sheet dimensions and server preview shortages remain authoritative. Completed/closed/shortage outcomes remain distinct. No new server routes or inventory semantics are introduced.
+
+## Completion navigation after durable ACK
+CommandConfirmation exposes a presentation-independent terminal flag derived only from the persisted ACK's current task.is_completed/is_closed_incomplete (legacy status=completed only when both new completion flags are absent). Historical result flags, remaining quantities, preview and GET alone never manufacture success. ACK schema fields are read-only additions; exact saved request method/body/token/profile and Room schema do not change. An ACK save failure remains unresolved and cannot navigate. New forms submit an empty compatible comment; saved older commands retain their original comments and bytes.

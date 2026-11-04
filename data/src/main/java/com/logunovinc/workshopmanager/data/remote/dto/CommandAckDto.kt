@@ -9,4 +9,9 @@ import kotlinx.serialization.Serializable
     @SerialName("execution_id") val executionId: Long? = null,
     val duplicate: Boolean,
 )
-@Serializable data class CommandTaskSnapshotDto(val id: Long, val version: Long)
+@Serializable data class CommandTaskSnapshotDto(val id: Long, val version: Long,
+    @SerialName("is_completed") val isCompleted: Boolean? = null,
+    @SerialName("is_cancelled") val isCancelled: Boolean? = null,
+    @SerialName("is_closed_incomplete") val isClosedIncomplete: Boolean = false,
+    val status: String? = null,
+)
