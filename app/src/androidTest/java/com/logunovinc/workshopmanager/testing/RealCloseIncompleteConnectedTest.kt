@@ -71,8 +71,8 @@ class RealCloseIncompleteConnectedTest {
         tag("manufacturing-list","manufacturing-preview");tag("manufacturing-list","manufacturing-review")
         waitText(if(prototype) "Подтвердить первый прототип?" else "Подтвердить выпуск?")
         compose.onNodeWithTag("manufacturing-confirm").performClick()
-        scroll("manufacturing-list",hasText("Действие подтверждено сервером",substring=true))
-        click("manufacturing-list",hasText("Карточка задания"));close(key)
+        scroll("manufacturing-list",hasText("Готово",substring=true))
+        click("manufacturing-list",hasText("К заданию"));close(key)
     }
     @Test fun actualClosePartialZeroFixedAndBothPrototypePhasesPreserveAccountingAndHistory() {
         compose.waitUntil(20_000) { compose.onAllNodesWithTag("auth-submit").fetchSemanticsNodes().firstOrNull()?.config?.contains(SemanticsProperties.Disabled)==false }
@@ -80,9 +80,9 @@ class RealCloseIncompleteConnectedTest {
         compose.onNodeWithTag("auth-submit").performScrollTo().performClick()
         open("receive","Приёмка");scroll("task-detail-list",hasTestTag("task-receive"));compose.onNodeWithTag("task-close-incomplete").assertDoesNotExist();home()
         open("dispatch","Отправка");click("task-detail-list",hasText("Отправить товары"))
-        click("dispatch-list",hasText("Отдано в этом шаге, шт"));compose.onNodeWithText("Отдано в этом шаге, шт").performTextInput("10")
-        click("dispatch-list",hasText("Проверить отправку"));waitText("Подтвердить отправку?");compose.onNodeWithText("Подтвердить",substring=false).performClick()
-        scroll("dispatch-list",hasText("Действие подтверждено сервером",substring=true));click("dispatch-list",hasText("Карточка задания"));close("dispatch")
+        click("dispatch-list",hasText("Отправить сейчас, шт"));compose.onNodeWithText("Отправить сейчас, шт").performTextInput("10")
+        click("dispatch-list",hasText("Отправить"));waitText("Подтвердить отправку?");compose.onNodeWithText("Подтвердить",substring=false).performClick()
+        scroll("dispatch-list",hasText("Готово",substring=true));click("dispatch-list",hasText("К заданию"));close("dispatch")
         open("dispatchZero","Отправка");close("dispatchZero")
         produce("fixed",false)
         open("prototypeZero","Изготовление");close("prototypeZero")

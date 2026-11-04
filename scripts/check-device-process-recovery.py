@@ -56,11 +56,12 @@ def click(node):
     pause()
 
 
-def find(text, scroll=False, attempts=12):
+def find(text, scroll=False, attempts=12, exact=False):
     for _ in range(attempts):
         tree = nodes()
         for node in tree:
-            if text in node.attrib.get('text', '') or text in node.attrib.get('content-desc', ''):
+            candidates=(node.attrib.get('text',''),node.attrib.get('content-desc',''))
+            if any(value == text if exact else text in value for value in candidates):
                 return node
         if scroll:
             device('shell', 'input', 'swipe', str(width // 2), str(int(height * .78)), str(width // 2), str(int(height * .35)), '300')
@@ -101,14 +102,20 @@ try:
     click(find('Пароль'))
     device('shell', 'input', 'text', 'synthetic-only')
     device('shell', 'input', 'keyevent', '4')
+    pause(1) # IME collapse must settle before taking coordinate bounds.
     click(find('Войти', scroll=True))
-    click(find('№101 · Приёмка', scroll=True))
+    click(find('Приёмка', scroll=True))
     click(find('Принять товары', scroll=True))
-    click(find('Прибыло в этом шаге', scroll=True))
+    click(find('Принять сейчас', scroll=True))
     device('shell', 'input', 'text', '4')
     device('shell', 'input', 'keyevent', '4')
-    click(find('Проверить приёмку', scroll=True))
-    click(find('Подтвердить'))
+    pause(1) # IME collapse must settle before taking coordinate bounds.
+    for node in nodes():
+        if node.attrib.get('checkable') == 'true' and node.attrib.get('checked') == 'true':
+            click(node) # This scenario deliberately accepts a partial batch.
+    click(find('Принять', scroll=True, exact=True))
+    find('Принять эту часть?', exact=True)
+    click(find('Подтвердить', exact=True))
     first = wait_state(lambda s: s['physical_executions'] == 1)
     pause(.5)
     screenshot('before-force-stop')
@@ -119,15 +126,15 @@ try:
     attempts_before_restart = len(json.loads((output / 'state.json').read_text())['attempts'])
     (output / 'allow-reply').write_text('Only explicit retry may now receive its duplicate ACK.')
     device('shell', 'am', 'start', '-W', '-n', component)
-    find('Журнал запросов', scroll=True)
+    find('Проверка действий', scroll=True)
     after_restart = wait_state(lambda s: s['physical_executions'] == 1)
     assert len(after_restart['attempts']) == attempts_before_restart, 'Launch automatically replayed a stock command'
     new_pid = device('shell', 'pidof', package).decode().strip()
     assert new_pid and new_pid != previous_pid, 'Expected a new app process'
-    click(find('Журнал запросов'))
+    click(find('Проверка действий'))
     find('Исход неизвестен', scroll=True)
     screenshot('after-cold-restart-pending')
-    click(find('Повторить исходный запрос', scroll=True))
+    click(find('Повторить действие', scroll=True))
     final = wait_state(lambda s: len(s['attempts']) > attempts_before_restart)
     find('Подтверждено сервером', scroll=True)
     assert final['physical_executions'] == 1

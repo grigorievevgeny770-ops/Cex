@@ -52,3 +52,6 @@ TaskRead maps is_closed_incomplete, closed_incomplete_reason/by/at independently
 
 ## Receive finalization entry (2026-11-02)
 RECEIVE remains excluded from close-incomplete. The detail finalization button opens the existing receipt form with final=true; only an explicit review/confirmation submits the existing executions payload with expected_version, expected_transfer_version, client_token, type=RECEIVE_GOODS, lines, final=true, reason, comment. Empty lines mean zero newly received, not removal of earlier receipts. Final shortage is server-completed receipt work, not loss approval or is_closed_incomplete.
+
+## 2026-11-04 — presentation simplification
+Normal UI no longer renders transport IDs/versions/documents or raw journal labels. This does not remove or rewrite any task/recipe version, command token, payload, actor/server isolation, ACK or quantities in storage/HTTP. UI quantities/sheet dimensions and server preview shortages remain authoritative. Completed/closed/shortage outcomes remain distinct. No new server routes or inventory semantics are introduced.

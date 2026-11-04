@@ -32,8 +32,7 @@ fun StockListRoute(viewModel: StockListViewModel, onPositionClick: (Long) -> Uni
 fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit, onPositionClick: (Long) -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Склад цеха", style = MaterialTheme.typography.headlineMedium)
-        state.warehouse?.let { Text(it.name) }
-        OutlinedTextField(value = state.filter.query, onValueChange = { onIntent(StockListIntent.QueryChanged(it)) }, label = { Text("Поиск по всему складу") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = state.filter.query, onValueChange = { onIntent(StockListIntent.QueryChanged(it)) }, label = { Text("Найти товар") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row { Switch(checked = state.filter.onlyAvailable, onCheckedChange = { onIntent(StockListIntent.OnlyAvailableChanged(it)) }); Text("Только свободные") }
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error); TextButton(onClick = { onIntent(StockListIntent.Refresh) }) { Text("Повторить") } }
@@ -42,14 +41,15 @@ fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit
                 if (state.items.isEmpty() && !state.loading && state.error == null) item { Text("Позиций по этому запросу нет") }
                 items(state.items, key = StockPosition::productId) { position ->
                     Card(Modifier.fillMaxWidth().clickable { onPositionClick(position.productId) }) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(position.productName ?: "Товар №${position.productId}", style = MaterialTheme.typography.titleMedium)
-                        position.sku?.let { Text("Артикул $it") }
+                        Text(position.productName ?: "Товар", style = MaterialTheme.typography.titleMedium)
                         StockTotals(position)
-                        if (position.dimensions.isNotEmpty()) Text("Размеров: ${position.dimensions.size}")
+                        position.dimensions.take(3).forEach { dimension ->
+                            Text("${QuantityFormatter.format(dimension.length)} м · ${dimension.sheets} листов · свободно ${dimension.freeSheets?.toString() ?: "неизвестно"}")
+                        }
                         if (position.dimensions.any { it.free == null || it.freeSheets == null }) Text("Свободный остаток по размерам неизвестен")
                     } }
                 }
-                if (state.hasMore) item { OutlinedButton(onClick = { onIntent(StockListIntent.LoadMore) }, enabled = !state.loadingMore, modifier = Modifier.fillMaxWidth()) { Text(if (state.loadingMore) "Загружаем…" else "Ещё позиции (${state.items.size} из ${state.total})") } }
+                if (state.hasMore) item { OutlinedButton(onClick = { onIntent(StockListIntent.LoadMore) }, enabled = !state.loadingMore, modifier = Modifier.fillMaxWidth()) { Text(if (state.loadingMore) "Загружаем…" else "Ещё товары") } }
             }
         }
     }
@@ -70,19 +70,15 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
         item {
             Text(position?.productName ?: "Позиция склада", style = MaterialTheme.typography.headlineMedium)
-            state.warehouse?.let { Text(it.name) }
-            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
             TextButton(onClick = { onIntent(StockDetailIntent.Refresh) }) { Text("Обновить") }
         }
         if (position != null) {
             item {
-                position.sku?.let { Text("Артикул $it") }
-                Text("Товар №${position.productId}")
                 StockTotals(position)
-                Text("Без распределения по размерам: физически ${QuantityFormatter.format(position.unallocatedStock)} ${position.baseUnit}")
-                Text("Размеры и листы", style = MaterialTheme.typography.titleLarge)
-                if (position.dimensions.isEmpty()) Text("Размерных остатков нет")
+                if (position.unallocatedStock.signum() != 0 && position.dimensions.isNotEmpty()) Text("Без размера: ${QuantityFormatter.format(position.unallocatedStock)} ${position.baseUnit}")
+                if (position.dimensions.isNotEmpty()) Text("Размеры", style = MaterialTheme.typography.titleLarge)
             }
             items(position.dimensions) { dimension ->
                 Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -97,6 +93,6 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
 }
 @Composable
 private fun StockTotals(position: StockPosition) {
-    Text("Физически: ${QuantityFormatter.format(position.quantity)} ${position.baseUnit}")
-    Text("Свободно: ${QuantityFormatter.format(position.free)} ${position.baseUnit}", color = if (position.free.signum() < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+    Text("На складе: ${QuantityFormatter.format(position.quantity)} ${position.baseUnit}")
+    if (position.free.compareTo(position.quantity) != 0) Text("Доступно: ${QuantityFormatter.format(position.free)} ${position.baseUnit}", color = if (position.free.signum() < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
 }

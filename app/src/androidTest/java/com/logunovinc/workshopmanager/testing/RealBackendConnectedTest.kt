@@ -79,16 +79,15 @@ class RealBackendConnectedTest {
         compose.onNodeWithTag("auth-login").performTextReplacement("ui-worker-$n")
         compose.onNodeWithTag("auth-password").performTextReplacement("isolated-worker-password")
         compose.onNodeWithTag("auth-submit").performScrollTo().performClick()
-        waitText("№${task("receive").getValue("id").jsonPrimitive.long} ·")
+        compose.waitUntil(20_000) { compose.onAllNodesWithTag("task-card-${task("receive").getValue("id").jsonPrimitive.long}").fetchSemanticsNodes().isNotEmpty() }
     }
     private fun open(key: String, type: String) {
-        val label = "№${task(key).getValue("id").jsonPrimitive.long} · $type"
-        waitText(label); compose.onNodeWithText(label).performScrollTo().performClick()
+        click("task-list",hasTestTag("task-card-${task(key).getValue("id").jsonPrimitive.long}"))
     }
     private fun home() { compose.onNodeWithTag("nav-stock").performClick(); waitText("Склад цеха"); compose.onNodeWithTag("nav-tasks").performClick() }
     private fun confirmed(list: String) {
         compose.waitUntil(20_000) {
-            try { compose.onNodeWithTag(list).performScrollToNode(hasText("Действие подтверждено сервером",substring=true));true } catch (_: AssertionError) { false }
+            try { compose.onNodeWithTag(list).performScrollToNode(hasText("Готово",substring=true));true } catch (_: AssertionError) { false }
         }
     }
     private fun receive(qty: String, final: Boolean) {
@@ -114,7 +113,7 @@ class RealBackendConnectedTest {
             tagged("manufacturing-list","prototype-material-qty-1");compose.onNodeWithTag("prototype-material-qty-1").performTextInput("4")
         }
         commit()
-        if(prototype) { waitText("Введите только выпуск");output("3");commit();waitText("изготовлено 5 · осталось 5") }
+        if(prototype) { waitText("Укажите, сколько изготовить");output("3");commit();waitText("изготовлено 5 · осталось 5") }
         home()
     }
     @Test fun actualBackendAllThreeFlowsAndDifferentWorkerContinuation() {
@@ -123,8 +122,8 @@ class RealBackendConnectedTest {
         compose.onNodeWithText("Выйти").performClick();login(2);open("receive","Приёмка");receive("5",true)
         home();manufacture("fixed",false);manufacture("prototype",true)
         open("dispatch","Отправка");click("task-detail-list",hasText("Отправить товары"))
-        click("dispatch-list",hasText("Отдано в этом шаге, шт"));compose.onNodeWithText("Отдано в этом шаге, шт").performTextInput("3")
-        click("dispatch-list",hasText("Проверить отправку"));waitText("Подтвердить отправку?");compose.onNodeWithText("Подтвердить",substring=false).performClick();confirmed("dispatch-list")
-        home();compose.onNodeWithTag("nav-stock").performClick();waitText("Физически: 43 шт")
+        click("dispatch-list",hasText("Отправить сейчас, шт"));compose.onNodeWithText("Отправить сейчас, шт").performTextInput("3")
+        click("dispatch-list",hasText("Отправить"));waitText("Подтвердить отправку?");compose.onNodeWithText("Подтвердить",substring=false).performClick();confirmed("dispatch-list")
+        home();compose.onNodeWithTag("nav-stock").performClick();waitText("На складе: 43 шт")
     }
 }

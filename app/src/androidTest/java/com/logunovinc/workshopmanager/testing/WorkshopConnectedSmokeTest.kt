@@ -30,7 +30,7 @@ class WorkshopConnectedSmokeTest {
         compose.onNodeWithTag("auth-login").performTextInput("fixture-worker")
         compose.onNodeWithTag("auth-password").performTextInput("synthetic-only")
         compose.onNodeWithTag("auth-submit").performScrollTo().performClick()
-        waitText("№101", substring = true)
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-card-101").fetchSemanticsNodes().isNotEmpty() }
     }
     private fun clickInList(list: String, tag: String) {
         compose.onNodeWithTag(list).performScrollToNode(hasTestTag(tag))
@@ -47,10 +47,12 @@ class WorkshopConnectedSmokeTest {
     @Test fun loginReceiveConfirmationHistoryAndServerStockRefreshSurviveRecreate() {
         login()
         compose.onNodeWithTag("nav-stock").performClick()
-        waitText("Физически: 0 шт")
+        waitText("На складе: 0 шт")
         compose.onNodeWithTag("nav-tasks").performClick()
-        waitText("№101 · Приёмка")
-        compose.onNodeWithText("№101 · Приёмка").performScrollTo().performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-card-101").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-card-101").performScrollTo().performClick()
+        compose.onAllNodesWithText("№101",substring=true).assertCountEquals(0)
+        compose.onAllNodesWithText("Артикул",substring=true).assertCountEquals(0)
         clickInList("task-detail-list", "task-receive")
         compose.onNodeWithTag("receive-list").performScrollToNode(hasTestTag("receive-qty-1001"))
         compose.onNodeWithTag("receive-qty-1001").performTextInput("4")
@@ -62,20 +64,21 @@ class WorkshopConnectedSmokeTest {
         compose.onNodeWithTag("receive-confirm").performClick()
         compose.waitUntil(15_000) { backend.backend.executions.get() == 1 }
         compose.onNodeWithTag("receive-list").performScrollToIndex(0)
-        waitText("Действие подтверждено сервером", substring = true)
+        waitText("Готово", substring = true)
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
         assertEquals(1, backend.backend.executions.get())
         assertEquals(0, backend.backend.starts.get())
         compose.onNodeWithTag("receive-list").performScrollToIndex(0)
-        waitText("Карточка задания")
-        compose.onNodeWithText("Карточка задания").performClick()
-        compose.onNodeWithTag("task-detail-list").performScrollToNode(hasText("Факт №5001", substring = true))
-        waitText("Материал: 4")
+        waitText("К заданию")
+        compose.onNodeWithText("К заданию").performClick()
+        clickInList("task-detail-list","task-history-toggle")
+        compose.onNodeWithTag("task-detail-list").performScrollToNode(hasTestTag("execution-5001"))
+        waitText("Материал: 4 шт")
         screenshot("received-history")
         compose.onNodeWithTag("nav-stock").performClick()
-        waitText("Физически: 4 шт")
-        compose.onNodeWithText("Физически: 4 шт").assertIsDisplayed()
+        waitText("На складе: 4 шт")
+        compose.onNodeWithText("На складе: 4 шт").assertIsDisplayed()
         assertTrue(backend.backend.stockReads.get() >= 2)
         assertEquals(1, backend.backend.executions.get())
         screenshot("stock-after-receive")
@@ -83,7 +86,7 @@ class WorkshopConnectedSmokeTest {
     @Test fun prototypeIsEnteredOnceThenUiUsesOnlyOutputByRecipe() {
         backend.backend.prototypeScenario = true
         login()
-        compose.onNodeWithText("№101 · Изготовление").performScrollTo().performClick()
+        compose.onNodeWithTag("task-card-101").performScrollTo().performClick()
         clickInList("task-detail-list", "task-manufacturing")
         compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasTestTag("manufacturing-output-qty"))
         compose.onNodeWithTag("manufacturing-output-qty").performTextInput("2")
@@ -95,7 +98,7 @@ class WorkshopConnectedSmokeTest {
         compose.onNodeWithTag("prototype-material-qty-1").performTextInput("4")
         clickInList("manufacturing-list", "manufacturing-preview")
         compose.waitUntil(15_000) { backend.backend.previews.get() == 1 }
-        compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasText("Предлагаемая норма", substring = true))
+        compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasText("Этот расход запомним", substring = true))
         assertEquals(0, backend.backend.manufacturingExecutions.get())
         clickInList("manufacturing-list", "manufacturing-review")
         waitText("Подтвердить первый прототип?")
@@ -103,7 +106,7 @@ class WorkshopConnectedSmokeTest {
         compose.onNodeWithTag("manufacturing-confirm").performClick()
         compose.waitUntil(15_000) { backend.backend.manufacturingExecutions.get() == 1 }
         compose.onNodeWithTag("manufacturing-list").performScrollToIndex(0)
-        waitText("Введите только выпуск. Расход рассчитает сервер по норме")
+        waitText("Укажите, сколько изготовить")
         waitText("изготовлено 2 · осталось 8", substring = true)
         compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasTestTag("manufacturing-output-qty"))
         compose.onNodeWithTag("manufacturing-output-qty").performTextInput("3")
@@ -122,23 +125,23 @@ class WorkshopConnectedSmokeTest {
         screenshot("manufacturing-by-recipe-success")
     }
     @Test fun finalReceiveEntryPreservesPreviousFourAndExplicitZeroFinalSendsOnlyReceiveCommand() {
-        login();compose.onNodeWithText("№101 · Приёмка").performScrollTo().performClick()
+        login();compose.onNodeWithTag("task-card-101").performScrollTo().performClick()
         clickInList("task-detail-list","task-receive")
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("receive-qty-1001").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("receive-list").performScrollToNode(hasTestTag("receive-qty-1001"));compose.onNodeWithTag("receive-qty-1001").performTextInput("4")
         clickInList("receive-list","receive-review");waitText("Принять эту часть?");compose.onNodeWithTag("receive-confirm").performClick()
         compose.waitUntil(15_000) { backend.backend.executions.get()==1 }
-        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Карточка задания");compose.onNodeWithText("Карточка задания").performClick()
+        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("К заданию");compose.onNodeWithText("К заданию").performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-finish-receive").fetchSemanticsNodes().isNotEmpty() }
         clickInList("task-detail-list","task-finish-receive")
-        waitText("Можно завершить, даже если",true);assertEquals(1,backend.backend.executions.get())
-        compose.activityRule.scenario.recreate();waitText("Можно завершить, даже если",true);assertEquals(1,backend.backend.executions.get())
+        waitText("Можно принять 0",true);assertEquals(1,backend.backend.executions.get())
+        compose.activityRule.scenario.recreate();waitText("Можно принять 0",true);assertEquals(1,backend.backend.executions.get())
         compose.onNodeWithTag("receive-list").performScrollToNode(hasText("Причина недостачи, если она есть"));compose.onNodeWithText("Причина недостачи, если она есть").performTextInput("Остальная часть не прибыла")
         clickInList("receive-list","receive-review");waitText("Завершить приёмку?")
         waitText("ранее принято 4 · остаток до этого шага 6",true)
         assertEquals(1,backend.backend.executions.get());compose.onNodeWithTag("receive-confirm").performClick()
         compose.waitUntil(15_000) { backend.backend.executions.get()==2 }
-        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Приёмка завершена с недостачей",true)
+        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Приёмка завершена. Недостачу",true)
         val payload=Json.parseToJsonElement(backend.backend.receiveBodies.last()).jsonObject
         assertEquals("RECEIVE_GOODS",payload["type"]!!.jsonPrimitive.content);assertTrue(payload["final"]!!.jsonPrimitive.boolean)
         assertTrue(payload["lines"]!!.jsonArray.isEmpty());assertEquals(3L,payload["expected_transfer_version"]!!.jsonPrimitive.long)

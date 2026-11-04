@@ -30,19 +30,19 @@ fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (Dispatch
     val task = state.task
     LazyColumn(Modifier.fillMaxSize().testTag("dispatch-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Text("Отправка · №${task?.id ?: ""}", style = MaterialTheme.typography.headlineMedium)
-            Text("Введите фактически отданное количество в этом шаге. Товар будет в пути: получатель ещё не принял его. Основной склад зачислит товар после отдельной приёмки")
+            Text("Отправка", style = MaterialTheme.typography.headlineMedium)
+            Text("Укажите, сколько отправляете сейчас")
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
+            state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
             when (val result = state.result) {
-                is ExecutionResultState.Confirmed -> { Text("Действие подтверждено сервером · версия ${result.receipt.taskVersion}", color = MaterialTheme.colorScheme.primary); Text("Отправленный товар в пути; получатель ещё не принял"); TextButton(onClick = onDetailClick) { Text("Карточка задания") } }
-                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.message}", color = MaterialTheme.colorScheme.error); TextButton(onClick = onRecoveryClick) { Text("Восстановить исходный запрос") } }
-                is ExecutionResultState.Rejected -> Text(result.error.message, color = MaterialTheme.colorScheme.error)
+                is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary); Text("Товар в пути"); TextButton(onClick = onDetailClick) { Text("К заданию") } }
+                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error); TextButton(onClick = onRecoveryClick) { Text("Проверить действие") } }
+                is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
                 ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
                 else -> Unit
             }
-            state.pending?.let { pending -> Text("Есть сохранённый запрос: ${pending.summary.title}"); pending.summary.lines.forEach { Text(it) }; TextButton(onClick = onRecoveryClick) { Text("Открыть журнал запросов") } }
-            if (task != null && !task.canExecute) Text("Отправка сейчас недоступна. Обновите карточку или откройте историю")
+            state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) }; TextButton(onClick = onRecoveryClick) { Text("Проверить действие") } }
+            if (task != null && !task.canExecute) Text("Отправка недоступна")
         }
         items(task?.lines.orEmpty(), key = TaskLine::id) { line ->
             val input = state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id)
@@ -52,16 +52,14 @@ fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (Dispatch
                 Text("Уже отправлено ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
                 if (sheets) {
                     Text("Листы: отправлено ${line.actualSheets ?: "—"} · осталось ${line.remainingSheets ?: "—"}")
-                    line.sheetLength?.let { Text("Длина по заданию ${QuantityFormatter.format(it)} м") }
+                    line.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
                     OutlinedTextField(value = input.sheets, onValueChange = { onIntent(DispatchExecutionIntent.SheetsChanged(line.id, it)) }, label = { Text("Отдано листов в этом шаге") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(DispatchExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Отдано в этом шаге, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
+                } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(DispatchExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Отправить сейчас, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
             } }
         }
         item {
-            Text("Остаток задания не считается потерей")
-            OutlinedTextField(value = state.comment, onValueChange = { onIntent(DispatchExecutionIntent.CommentChanged(it)) }, label = { Text("Комментарий") }, enabled = state.editable, modifier = Modifier.fillMaxWidth())
-            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(DispatchExecutionIntent.ReviewClick) }, enabled = state.editable, modifier = Modifier.fillMaxWidth()) { Text("Проверить отправку") }
-            TextButton(onClick = { onIntent(DispatchExecutionIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить задание") }
+            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(DispatchExecutionIntent.ReviewClick) }, enabled = state.editable, modifier = Modifier.fillMaxWidth()) { Text("Отправить") }
+            TextButton(onClick = { onIntent(DispatchExecutionIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить") }
         }
     }
     state.review?.let { review ->
@@ -71,8 +69,9 @@ fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (Dispatch
                     val line = task?.lines?.firstOrNull { it.id == actual.taskLineId }
                     val amount = actual.sheets?.let { "$it листов" } ?: "${actual.quantity?.toPlainString()?.replace('.', ',')} ${line?.baseUnit.orEmpty()}"
                     Text("${line?.productName.orEmpty()}: $amount")
+                    line?.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
                 }
-                Text("В пути, получатель ещё не принял. Основной склад ещё не зачисляет этот товар")
+                Text("Товар будет в пути до приёмки получателем")
                 if (review.comment.isNotBlank()) Text(review.comment)
             } },
             confirmButton = { Button(onClick = { onIntent(DispatchExecutionIntent.ConfirmClick) }, enabled = state.result != ExecutionResultState.Sending && state.pending == null) { Text("Подтвердить") } },

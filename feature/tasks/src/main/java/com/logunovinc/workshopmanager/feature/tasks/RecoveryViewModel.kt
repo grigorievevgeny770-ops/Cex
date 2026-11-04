@@ -24,9 +24,9 @@ class RecoveryViewModel @Inject constructor(repository: PendingCommandRepository
                     try {
                         val outcome = retry(intent.id)
                         mutableState.update { it.copy(message = when (outcome) {
-                            is CommandOutcome.Confirmed -> "Действие подтверждено сервером. Обновите карточку и остатки"
-                            is CommandOutcome.Unresolved -> "Исход требует восстановления: ${outcome.error.message}"
-                            is CommandOutcome.Rejected -> outcome.error.message
+                            is CommandOutcome.Confirmed -> "Действие подтверждено сервером"
+                            is CommandOutcome.Unresolved -> "Исход неизвестен: ${outcome.error.operationalMessage()}"
+                            is CommandOutcome.Rejected -> outcome.error.operationalMessage()
                         }) }
                     } finally { mutableState.update { it.copy(retrying = it.retrying - intent.id) } }
                 }

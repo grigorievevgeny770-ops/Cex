@@ -53,7 +53,7 @@ class ServerSelectorUiTest {
         assertEquals("https://147-45-154-211.sslip.io/",settings.environment.value)
         compose.onNodeWithTag("auth-server-apply").performScrollTo().performClick()
         compose.waitUntil(10_000) { settings.environment.value=="https://custom.example/test/" }
-        compose.onNodeWithText("Сервер: https://custom.example/test/").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Выбран: https://custom.example/test/").performScrollTo().assertIsDisplayed()
         assertEquals(ServerOption.CUSTOM,vm.uiState.value.serverOption)
         select(ServerOption.USB)
         compose.waitUntil(10_000) { settings.environment.value=="http://127.0.0.1:8000/" }

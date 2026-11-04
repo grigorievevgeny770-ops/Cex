@@ -18,28 +18,32 @@ fun RecoveryRoute(viewModel: RecoveryViewModel, onTaskClick: (Long) -> Unit) {
 }
 @Composable
 fun RecoveryScreen(state: RecoveryUiState, onIntent: (RecoveryIntent) -> Unit, onTaskClick: (Long) -> Unit) {
+    var showFinished by remember { mutableStateOf(false) }
+    var lastRetry by remember { mutableStateOf<String?>(null) }
+    val finished = state.commands.filter { it.state in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
+    val visible = state.commands.filter { it !in finished || showFinished || it.id == lastRetry }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
-        item { Text("Журнал запросов", style = MaterialTheme.typography.headlineMedium); Text("Сохранённые подтверждённые вами действия этого аккаунта и сервера. Повтор сохраняет исходный состав запроса"); state.message?.let { Text(it) } }
-        if (state.commands.isEmpty()) item { Text("Сохранённых команд нет") }
-        items(state.commands, key = PendingCommand::id) { command ->
+        item { Text("Проверка действий", style = MaterialTheme.typography.headlineMedium); Text("Проверьте исход перед новым выполнением. Повтор отправит то же действие"); state.message?.let { Text(it) } }
+        if (visible.isEmpty()) item { Text("Нет действий для проверки") }
+        if (finished.isNotEmpty()) item { TextButton(onClick = { showFinished = !showFinished }) { Text(if (showFinished) "Скрыть завершённые" else "Завершённые") } }
+        items(visible, key = PendingCommand::id) { command ->
             Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(command.summary.title, style = MaterialTheme.typography.titleMedium)
+                Text(command.summary.operationalTitle(), style = MaterialTheme.typography.titleMedium)
                 Text(localDate(command.createdAt))
-                command.summary.lines.forEach { Text(it) }
+                command.summary.operationalLines().forEach { Text(it) }
                 if (command.summary.comment.isNotBlank()) Text("Комментарий: ${command.summary.comment}")
                 Text(when (command.state) {
                     PendingState.PREPARED -> "Сохранено перед отправкой"
                     PendingState.IN_FLIGHT -> "Отправляется"
-                    PendingState.UNKNOWN -> "Исход неизвестен; это сохранённый запрос, а не черновик"
+                    PendingState.UNKNOWN -> "Исход неизвестен. Возможно, действие уже выполнено"
                     PendingState.NEEDS_REVIEW -> "Требуется сверка с сервером"
                     PendingState.ACKNOWLEDGED -> "Подтверждено сервером"
                     PendingState.REJECTED -> "Запрос отклонён сервером"
                 })
-                command.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
-                command.knownExecutionId?.let { Text("Известный факт №$it — проверьте его в карточке задания") }
-                if (command.state == PendingState.NEEDS_REVIEW) Text("Не создавайте новую команду вместо этой. Восстановите доступ тем же аккаунтом и повторите исходный запрос; если отказ остаётся, нужна сверка администратором сервера")
-                if (command.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED)) Button(onClick = { onIntent(RecoveryIntent.Retry(command.id)) }, enabled = command.id !in state.retrying) { Text(if (command.id in state.retrying) "Отправляем исходный запрос…" else "Повторить исходный запрос") }
-                TextButton(onClick = { onTaskClick(command.taskId) }) { Text("Открыть задание №${command.taskId}") }
+                command.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                if (command.state == PendingState.NEEDS_REVIEW) Text("Не выполняйте заново. Повторите это действие; при повторном отказе обратитесь к руководителю")
+                if (command.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED)) Button(onClick = { lastRetry = command.id; onIntent(RecoveryIntent.Retry(command.id)) }, enabled = command.id !in state.retrying) { Text(if (command.id in state.retrying) "Отправляем…" else "Повторить действие") }
+                TextButton(onClick = { onTaskClick(command.taskId) }) { Text("К заданию") }
             } }
         }
     }

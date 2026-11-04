@@ -24,3 +24,7 @@
 
 ## Дополнение: селектор сервера
 - [x] Preset dropdown + remote HTTPS default + custom URL; regression/Compose и debug APK, локальный commit.
+
+## Дополнение: минимальный рабочий UI
+- [x] Audit/упрощение Auth, TaskList/Detail, Receive/Dispatch/Manufacture, Stock и Recovery.
+- [x] Regression unit/Compose + actual backend UI fixture, visual screenshots, APK и локальный commit.

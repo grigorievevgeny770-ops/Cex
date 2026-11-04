@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 810 148 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 810 437 байт.
 
-SHA256: `a3dc82d7b8b758e2c0ef6849edf5f97554b41c41630ebcd2171ae6484cb47fd4`.
+SHA256: `87f54d1dff7364a903bb631500def20c998370d20bfcfba7c125d5a80205f9cc`.
 
 APK установлен и запущен на emulator-5554/API37. Debug/release default: `https://147-45-154-211.sslip.io/` (saved environment takes precedence). SDK/JDK и настройка окружений — в README.md.
 
@@ -20,7 +20,7 @@ Connected tests запускать на выделенном эмуляторе:
 
 ## Независимо проверено
 
-- 128 JVM-тестов, 8 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
+- 131 JVM-тест, 9 обычных device-тестов и 2 real-backend UI E2E: 0 failures/errors/skips; lint, assembleDebug и архитектура успешны.
 - Compose: login → receive → confirm → history → server stock refresh; prototype 2/4 → готовая норма → следующий выпуск 3/6 без materials. Recreate не повторяет START/EXECUTE.
 - Реальный Android Keystore и Room reopen.
 - Настоящий force-stop/relaunch: PID12852 → 13203, один физический факт, прежние body/token, повтор только по нажатию.
@@ -111,3 +111,13 @@ attestation привязывает UI к owned marker/revision до входа. 
 На экране входа: удалённый HTTPS147-45-154-211.sslip.io, локальный emulator10.0.2.2:8000, USB127.0.0.1:8000 и свой URL. Пользователь явно выбрал remote default для обычного debug/release; существующий сохранённый выбор не перезаписывается. Пункт своего URL требует применения, до этого вход заблокирован. Смена адреса использует прежний session/cookie generation guard и очищает credentials; pending остаются по server+actor. Выбор не вызывает login/HTTP и не делает fallback. ProcessFixture/test DI остаются изолированными.
 
 128unit +8connected,0fail/errors/skips,lint/assembleDebug: /tmp/tseh-server-selector-verify2.log. Независимый root verify: /tmp/tseh-server-selector-root-verify.log. Новая Compose-проверка использует fake repository и не подключается к удалённому серверу; живую совместимость/авторизацию этого сервера данный этап не проверяет. Предыдущие real-backend E2E отчёты относятся к предшествующим этапам.
+
+## 2026-11-04 — минимальный рабочий интерфейс
+
+Все основные экраны сокращены до товара, количества, единиц, размеров и коротких рабочих подсказок. Убраны ID/версии/SKU, ссылки на документы, технический аудит, дубли аккаунта/склада и необязательные комментарии форм. Листовые материалы вводятся листами/длиной; результат preview показывает расход именно текущей партии. Список изготовления показывает готовое изделие; история сохраняет фактическое количество и остаток. Операционная история и завершённые записи recovery свёрнуты. На складе «Доступно» показывается только при отличии от «На складе»; unknown/negative не заменяются нулём.
+
+Domain/data HTTP/DTO/command payloads не менялись. Журнал хранит прежние версии, байты и UUID; UI только убирает известные служебные подписи. Неопределённый исход явно обозначается и допускает только ручной повтор исходного действия. Приёмка/недостача, close incomplete, прототип и автоматическая норма сохраняют серверную семантику.
+
+Проверки: 131unit/9connected, failures/errors/skips=0, lint/assembleDebug (CONNECTED_TESTS=1 scripts/verify.sh, /tmp/tseh-simple-ui-final-verify6.log). Независимый root scripts/verify.sh: /tmp/tseh-simple-ui-root-verify.log PASS. Actual backend Compose baseline: /tmp/tseh-simple-ui-real-baseline/result.json PASS, backend d67be7c5d5ee5e60af5ff7399469c8e91c64747c; receive4+5final/shortage1, fixed3/6, prototype2/4→3/6, dispatch3 in transit, exact fact proofs and stock43/0/5. Все движения только в owned fixture DB. Финальные снимки /tmp/tseh-simple-ui-final-screens визуально проверены супервизором.
+
+Actual process-death UI proof: /tmp/tseh-simple-ui-process-recovery3/result.json PASS. PID21069→21477, one physical fact, identical body/token, no replay on launch; safe manual retry returned ACK. Separate .processfixture package, synthetic loopback server only. Root visually reviewed recovery unknown-outcome screen. Fixture harness fixes remove unnecessary reverse DNS and wait for IME before coordinate selection; application semantics unchanged.

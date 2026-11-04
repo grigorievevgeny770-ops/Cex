@@ -26,8 +26,6 @@ fun AuthRoute(viewModel: AuthViewModel, authenticatedContent: @Composable (Actor
 fun AuthScreen(state: AuthUiState, onIntent: (AuthIntent) -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Цех", style = MaterialTheme.typography.headlineLarge)
-        Text("Вход работника склада", style = MaterialTheme.typography.titleLarge)
-        Text("Сервер: ${state.environment}", style = MaterialTheme.typography.bodySmall)
         var serverMenu by remember { mutableStateOf(false) }
         Box(Modifier.fillMaxWidth()) {
             OutlinedButton(onClick = { serverMenu = true }, enabled = !state.busy && !state.restoring,
@@ -46,6 +44,7 @@ fun AuthScreen(state: AuthUiState, onIntent: (AuthIntent) -> Unit) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false), modifier = Modifier.fillMaxWidth().testTag("auth-server-custom-url"))
             OutlinedButton(onClick = { onIntent(AuthIntent.ApplyEnvironment) }, enabled = !state.busy && !state.restoring,
                 modifier = Modifier.testTag("auth-server-apply")) { Text("Применить адрес") }
+            Text("Выбран: ${state.environment}", style = MaterialTheme.typography.bodySmall)
         }
         OutlinedTextField(value = state.login, onValueChange = { onIntent(AuthIntent.LoginChanged(it)) },
             label = { Text("Логин") }, singleLine = true, enabled = !state.busy && !state.restoring, modifier = Modifier.fillMaxWidth().testTag("auth-login"))
@@ -53,10 +52,9 @@ fun AuthScreen(state: AuthUiState, onIntent: (AuthIntent) -> Unit) {
             label = { Text("Пароль") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
             enabled = !state.busy && !state.restoring, modifier = Modifier.fillMaxWidth().testTag("auth-password"))
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        state.notice?.let { Text(it) }
-        if (state.restoring) Text("Проверяем сохранённую сессию…")
+        state.notice?.takeIf { it.isNotBlank() && state.error == null }?.let { Text(it) }
+        if (state.restoring) Text("Входим…")
         if (state.busy || state.restoring) LinearProgressIndicator(Modifier.fillMaxWidth())
         Button(onClick = { onIntent(AuthIntent.LoginClick) }, enabled = !state.busy && !state.restoring && state.environmentApplied, modifier = Modifier.fillMaxWidth().testTag("auth-submit")) { Text("Войти") }
-        TextButton(onClick = { onIntent(AuthIntent.RetryRestore) }, enabled = !state.busy && !state.restoring) { Text("Проверить сессию снова") }
     }
 }

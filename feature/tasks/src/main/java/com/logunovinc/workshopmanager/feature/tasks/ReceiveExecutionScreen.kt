@@ -30,21 +30,21 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
     val task = state.task
     LazyColumn(Modifier.fillMaxSize().testTag("receive-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Text("Приёмка · №${task?.id ?: ""}", style = MaterialTheme.typography.headlineMedium)
-            Text("Введите только фактически прибывшее в этом шаге количество. Ранее принятые товары повторно не вводите")
-            if (state.final) Text("Можно завершить, даже если в этом шаге ничего не прибыло; ранее принятое сохранится, оставшееся станет недостачей для разбора менеджером")
+            Text("Приёмка", style = MaterialTheme.typography.headlineMedium)
+            Text("Укажите, сколько прибыло сейчас")
+            if (state.final) Text("Можно принять 0. Ранее принятое сохранится, недостачу разберёт руководитель")
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
+            state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
             when (val result = state.result) {
-                is ExecutionResultState.Confirmed -> { Text("Действие подтверждено сервером · версия ${result.receipt.taskVersion}", color = MaterialTheme.colorScheme.primary); TextButton(onClick = onDetailClick) { Text("Карточка задания") } }
-                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.message}", color = MaterialTheme.colorScheme.error); TextButton(onClick = onRecoveryClick) { Text("Восстановить исходный запрос") } }
-                is ExecutionResultState.Rejected -> Text(result.error.message, color = MaterialTheme.colorScheme.error)
+                is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary); TextButton(onClick = onDetailClick) { Text("К заданию") } }
+                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error); TextButton(onClick = onRecoveryClick) { Text("Проверить действие") } }
+                is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
                 ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
                 else -> Unit
             }
-            state.pending?.let { pending -> Text("Есть сохранённый запрос: ${pending.summary.title}"); pending.summary.lines.forEach { Text(it) }; TextButton(onClick = onRecoveryClick) { Text("Открыть журнал запросов") } }
-            if (task != null && !task.canExecute) Text("Выполнение сейчас недоступно. Обновите карточку или откройте историю")
-            if (task?.isCompleted == true && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
+            state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) }; TextButton(onClick = onRecoveryClick) { Text("Проверить действие") } }
+            if (task != null && !task.canExecute) Text("Приёмка недоступна")
+            if (task?.isCompleted == true && task.outcome == "shortage") Text("Приёмка завершена. Недостачу разберёт руководитель")
         }
         items(task?.lines.orEmpty(), key = TaskLine::id) { line ->
             val input = state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id)
@@ -54,17 +54,16 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
                 Text("План ${QuantityFormatter.format(line.planned)} · уже принято ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
                 if (sheets) {
                     Text("Листы: принято ${line.actualSheets ?: "—"} · осталось ${line.remainingSheets ?: "—"}")
-                    line.sheetLength?.let { Text("Длина по заданию ${QuantityFormatter.format(it)} м") }
+                    line.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
                     OutlinedTextField(value = input.sheets, onValueChange = { onIntent(ReceiveExecutionIntent.SheetsChanged(line.id, it)) }, label = { Text("Прибыло листов в этом шаге") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(ReceiveExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Прибыло в этом шаге, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("receive-qty-${line.id}"))
+                } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(ReceiveExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Принять сейчас, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("receive-qty-${line.id}"))
             } }
         }
         item {
-            Row { Checkbox(checked = state.final, onCheckedChange = { onIntent(ReceiveExecutionIntent.FinalChanged(it)) }, enabled = state.editable); Text(if (state.final) "Завершить приёмку" else "Продолжить ожидание оставшегося") }
+            Row { Checkbox(checked = state.final, onCheckedChange = { onIntent(ReceiveExecutionIntent.FinalChanged(it)) }, enabled = state.editable); Text(if (state.final) "Завершить приёмку" else "Ждать остальное") }
             if (state.final) OutlinedTextField(value = state.reason, onValueChange = { onIntent(ReceiveExecutionIntent.ReasonChanged(it)) }, label = { Text("Причина недостачи, если она есть") }, enabled = state.editable, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = state.comment, onValueChange = { onIntent(ReceiveExecutionIntent.CommentChanged(it)) }, label = { Text("Комментарий") }, enabled = state.editable, modifier = Modifier.fillMaxWidth())
-            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ReceiveExecutionIntent.ReviewClick) }, modifier = Modifier.fillMaxWidth().testTag("receive-review"), enabled = state.editable) { Text("Проверить приёмку") }
-            TextButton(onClick = { onIntent(ReceiveExecutionIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить задание") }
+            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ReceiveExecutionIntent.ReviewClick) }, modifier = Modifier.fillMaxWidth().testTag("receive-review"), enabled = state.editable) { Text("Принять") }
+            TextButton(onClick = { onIntent(ReceiveExecutionIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить") }
         }
     }
     state.review?.let { review ->
@@ -80,9 +79,10 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
                     val line = task?.lines?.firstOrNull { it.id == actual.taskLineId }
                     val amount = actual.sheets?.let { "$it листов" } ?: "${actual.quantity?.toPlainString()?.replace('.', ',')} ${line?.baseUnit.orEmpty()}"
                     Text("${line?.productName.orEmpty()}: $amount")
+                    line?.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
                 }
-                if (review.final && review.shortage) Text("Приёмка завершится с недостачей. Это не утверждение потери; решение примет менеджер. Причина: ${review.reason}")
-                else if (!review.final) Text("Оставшийся товар продолжим ожидать. Недостача сейчас не утверждается")
+                if (review.final && review.shortage) Text("Остальное станет недостачей. Потерю это не утверждает. Причина: ${review.reason}")
+                else if (!review.final) Text("Остальное продолжим ждать")
                 if (review.comment.isNotBlank()) Text(review.comment)
             } },
             confirmButton = { Button(onClick = { onIntent(ReceiveExecutionIntent.ConfirmClick) }, modifier = Modifier.testTag("receive-confirm"), enabled = state.result != ExecutionResultState.Sending && state.pending == null) { Text("Подтвердить") } },

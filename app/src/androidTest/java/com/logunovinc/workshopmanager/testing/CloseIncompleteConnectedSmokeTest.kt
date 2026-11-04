@@ -21,8 +21,8 @@ class CloseIncompleteConnectedSmokeTest {
     private fun openTask() {
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("auth-submit").fetchSemanticsNodes().firstOrNull()?.config?.contains(SemanticsProperties.Disabled)==false }
         compose.onNodeWithTag("auth-login").performTextInput("fixture-worker");compose.onNodeWithTag("auth-password").performTextInput("synthetic-only")
-        compose.onNodeWithTag("auth-submit").performScrollTo().performClick();waitText("№101 · Отправка")
-        compose.onNodeWithText("№101 · Отправка").performScrollTo().performClick()
+        compose.onNodeWithTag("auth-submit").performScrollTo().performClick();compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-card-101").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-card-101").performScrollTo().performClick()
     }
     private fun dialog() {
         compose.waitUntil(15_000) { try { compose.onNodeWithTag("task-detail-list").performScrollToNode(hasTestTag("task-close-incomplete"));true } catch (_:AssertionError) { false } }
@@ -52,7 +52,7 @@ class CloseIncompleteConnectedSmokeTest {
     @Test fun anotherWorkerConflictRefreshesVersionsAndRequiresNewExplicitConfirmation() {
         backend.backend.closeConflictOnce=true
         openTask();dialog();reason("Причина UI");compose.onNodeWithTag("close-incomplete-confirm").performClick()
-        waitText("Другой сотрудник изменил задание")
+        waitText("Задание изменилось. Обновите данные и проверьте количество")
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-close-incomplete").fetchSemanticsNodes().firstOrNull()?.config?.contains(SemanticsProperties.Disabled)==false }
         assertEquals(1,backend.backend.closeAttempts.get());assertEquals(0,backend.backend.closes.get())
         dialog();reason("Причина UI");compose.onNodeWithTag("close-incomplete-confirm").performClick();confirmed()

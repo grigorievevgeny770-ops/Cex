@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import socket
+import socketserver
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -106,7 +107,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({'result': {'id': 101, 'execution_id': 5001, 'duplicate': True}, 'task': task()})
 
 
-server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+class LoopbackFixtureServer(ThreadingHTTPServer):
+    def server_bind(self):
+        # HTTPServer normally calls reverse DNS even for 127.0.0.1. This owned
+        # loopback fixture needs no DNS and must not depend on external resolution.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = 'localhost'
+        self.server_port = self.server_address[1]
+
+
+server = LoopbackFixtureServer(('127.0.0.1', 0), Handler)
 save()
 (args.output / 'port').write_text(str(server.server_address[1]))
 server.serve_forever()

@@ -58,3 +58,6 @@ All real write cases use a separately archived backend and a newly owned SQLite 
 
 ## Server selector/default (2026-11-03)
 128 JVM и8 connected tests passed,0 failures/errors/skips. Remote default BuildConfig and empty remote credentials; explicit preset changes persist through repository/new ViewModel, clear local credentials and do not login. Custom draft requires canonical URL apply and blocks unintended old-server login. Pure Compose test covers remote/emulator/USB/custom without external HTTP. Existing real E2E were not repeated for this presentation/default-only change.
+
+## Simplified operational UI (2026-11-04)
+131 JVM +9 connected,0fail/errors/skips; independent root verify PASS. UI assertions hide service metadata while retaining products, quantities and sheet dimensions; StockQuantityUiTest covers numerically equal scales, negative availability and unknown dimensional sheets. OperationalText tests preserve saved journal evidence and user notes while stripping only known generated labels. Actual backend baseline PASS: /tmp/tseh-simple-ui-real-baseline/result.json. Final screenshots reviewed at /tmp/tseh-simple-ui-final-screens. Actual force-stop UI harness PASS /tmp/tseh-simple-ui-process-recovery3/result.json: new PID, one physical fact, exact body/token and no automatic replay; Room exact retry regression also passed.

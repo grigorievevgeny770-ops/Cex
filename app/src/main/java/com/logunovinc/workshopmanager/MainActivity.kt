@@ -27,17 +27,17 @@ class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { WorkshopTheme { AuthRoute(authViewModel) { actor, logout -> WorkshopNavigation(actor.login, logout) } } }
+        setContent { WorkshopTheme { AuthRoute(authViewModel) { _, logout -> WorkshopNavigation(logout) } } }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WorkshopNavigation(login: String, onLogout: () -> Unit) {
+private fun WorkshopNavigation(onLogout: () -> Unit) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val route = entry?.destination?.route
-    Scaffold(topBar = { TopAppBar(title = { Text(login, maxLines = 1) }, navigationIcon = {
+    Scaffold(topBar = { TopAppBar(title = { Text("Цех") }, navigationIcon = {
         if (route != "tasks" && route != "stock") TextButton(onClick = { navController.popBackStack() }) { Text("Назад") }
     }, actions = { TextButton(onClick = onLogout) { Text("Выйти") } }) }, bottomBar = {
         if (route != "login") NavigationBar {
