@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.logunovinc.workshopmanager.core.ui.WorkshopTheme
 import com.logunovinc.workshopmanager.domain.pending.CommandConfirmation
@@ -51,7 +52,7 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
         if (route != "tasks" && route != "stock") TextButton(onClick = { navController.popBackStack() }) { Text("Назад") }
     }, actions = { TextButton(onClick = onLogout) { Text("Выйти") } }) }, bottomBar = {
         if (route != "login") NavigationBar {
-            listOf("tasks" to "Задания", "stock" to "Склад цеха").forEach { (destination, title) ->
+            listOf("tasks" to "Заявки", "stock" to "Остатки").forEach { (destination, title) ->
                 NavigationBarItem(modifier = Modifier.testTag("nav-$destination"), selected = entry?.destination?.hierarchy?.any { it.route == "$destination-stack" } == true, onClick = {
                     val stack = "$destination-stack"
                     if (entry?.destination?.hierarchy?.none { it.route == stack } != false) {
@@ -69,25 +70,21 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
             navigation(startDestination = "tasks", route = "tasks-stack") {
                 composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, consumeCompletion = { entry.savedStateHandle.remove<String>("completedCommandId") }) }
                 composable("task/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                    TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }, { navController.navigate("manufacturing/$it") }, { navController.navigate("receive/$it?final=true") }, onCompleted = completed)
+                    TaskDetailRoute(hiltViewModel(entry), onCompleted = completed)
                 }
-                composable("receive/{taskId}?final={final}", arguments = listOf(navArgument("taskId") { type = NavType.LongType }, navArgument("final") { type = NavType.BoolType; defaultValue = false })) { entry ->
-                    ReceiveExecutionRoute(hiltViewModel(entry), onCompleted = completed)
+                composable("receive/{taskId}?final={final}", arguments = listOf(navArgument("taskId") { type = NavType.LongType }, navArgument("final") { type = NavType.BoolType; defaultValue = false })) {
+                    LaunchedEffect(Unit) { leaveRetiredExecution(navController) }
                 }
-                composable("dispatch/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                    DispatchExecutionRoute(hiltViewModel(entry), onCompleted = completed)
+                composable("dispatch/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) {
+                    LaunchedEffect(Unit) { leaveRetiredExecution(navController) }
                 }
-                composable("manufacturing/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                    ManufacturingRoute(hiltViewModel(entry), onCompleted = completed)
+                composable("manufacturing/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) {
+                    LaunchedEffect(Unit) { leaveRetiredExecution(navController) }
                 }
                 // Migration only: Navigation 2.9 restores saved destination IDs before composing.
                 // Old saved stacks may still contain this removed screen; no recovery UI remains.
                 composable("recovery") {
-                    LaunchedEffect(Unit) {
-                        if (!navController.popBackStack("tasks", false)) navController.navigate("tasks") {
-                            popUpTo("recovery") { inclusive = true }; launchSingleTop = true
-                        }
-                    }
+                    LaunchedEffect(Unit) { leaveRetiredExecution(navController) }
                 }
             }
             navigation(startDestination = "stock", route = "stock-stack") {
@@ -96,4 +93,9 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
             }
         }
     }
+}
+
+/** Old execution routes stay registered so a restored back stack does not crash. They are not a worker action. */
+private fun leaveRetiredExecution(navController: NavHostController) {
+    if (!navController.popBackStack("tasks", false)) navController.navigate("tasks-stack") { launchSingleTop = true }
 }

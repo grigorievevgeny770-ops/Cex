@@ -21,7 +21,7 @@ import com.logunovinc.workshopmanager.core.ui.*
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
+fun TaskDetailRoute(viewModel: TaskDetailViewModel, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CompletedTaskEffect(state.lastConfirmation, onCompleted)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -31,10 +31,10 @@ fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Un
             awaitCancellation()
         }
     }
-    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onDispatchClick, onManufacturingClick, onFinishReceiveClick)
+    TaskDetailScreen(state, viewModel::onIntent)
 }
 @Composable
-fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit) {
+fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val task = state.task
@@ -43,7 +43,7 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
         LazyColumn(Modifier.fillMaxSize().testTag("task-detail-list").padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(task?.type?.title() ?: "Задание", style = MaterialTheme.typography.headlineSmall)
+                    Text(if (task?.type == TaskType.MANUFACTURE_PRODUCT) "Заявка" else "Документ склада", style = MaterialTheme.typography.headlineSmall)
                 }
                 state.retryError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
                 state.closeError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
@@ -67,22 +67,25 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
             }
             if (task != null) {
                 item {
+                    Text(task.workshopStage().title(), style = MaterialTheme.typography.titleMedium)
+                    Text(task.dueAt?.let { "Нужно к ${localDay(it)}" } ?: "Дата не указана")
                     if (task.comment.isNotBlank()) Text(task.comment)
                     if (task.isClosedIncomplete) {
-                        Text("Закрыта без полного выполнения", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
                         task.closedIncompleteReason?.let { Text("Причина: $it") }
-                        Text("Выполненное сохранено. Оставшаяся работа закрыта")
+                        Text("Выполненное на сервере сохранено. Оставшаяся работа закрыта там же")
                     }
-                    if (task.isCompleted == true && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
-                    if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported != true) Text("Нужна настройка производства. Обратитесь к руководителю")
-                    if (task.type == TaskType.UNKNOWN || task.isCompleted == null || task.isCancelled == null) Text("Выполнение недоступно")
-                    if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, modifier = Modifier.testTag("task-manufacturing"), enabled = state.executionAvailable) { Text("Изготовить изделие") }
-                    if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.executionAvailable) { Text("Отправить товары") }
-                    if (task.canCloseIncomplete) OutlinedButton(onClick = { onIntent(TaskDetailIntent.CloseIncompleteClick) }, modifier = Modifier.testTag("task-close-incomplete"), enabled = state.closeAvailable) { Text("Завершить без полного выполнения") }
-                    if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, modifier = Modifier.testTag("task-receive"), enabled = state.executionAvailable) { Text("Принять товары") }
-                    if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) OutlinedButton(onClick = { onFinishReceiveClick(task.id) }, modifier = Modifier.testTag("task-finish-receive"), enabled = state.executionAvailable) { Text("Завершить приёмку") }
+                    if (task.type != TaskType.MANUFACTURE_PRODUCT) Text("Это не заявка на изделия.")
+                    else if (task.productRequestLines().isEmpty()) Text("В заявке нет изделий.")
+                    when (task.workshopStage()) {
+                        WorkshopRequestStage.NEW, WorkshopRequestStage.IN_PROGRESS -> Text("Отметить «В работе», «Изготовлено» или «Передано на склад» пока нельзя: сервер такой шаг не принимает.")
+                        WorkshopRequestStage.SERVER_COMPLETED -> Text("Сервер завершил документ. Отдельных статусов «Изготовлено» и «Передано на склад» он не присылает.")
+                        WorkshopRequestStage.UNSUPPORTED -> Text("Статус заявки сервер не подтвердил. Действие недоступно.")
+                        else -> Unit
+                    }
                 }
-                items(task.lines.filter { task.type != TaskType.MANUFACTURE_PRODUCT || it.role == "output" }, key = { "line-${it.id}" }) { line -> TaskLineCard(line) }
+                items(task.productRequestLines(), key = { "line-${it.id}" }) { line ->
+                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { RequestLineText(line) } }
+                }
                 if (state.executions.isNotEmpty() || state.executionsLoading || state.executionsError != null) item {
                     TextButton(onClick = { showExecutions = !showExecutions }, modifier = Modifier.testTag("task-history-toggle")) { Text(if (showExecutions) "Скрыть историю" else "История") }
                 }
@@ -131,17 +134,5 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 modifier = Modifier.testTag("close-incomplete-confirm")) { Text(if (state.closeSending) "Закрываем…" else "Закрыть задачу") } },
             dismissButton = { TextButton(onClick = { onIntent(TaskDetailIntent.DismissClose) }, enabled = !state.closeSending) { Text("Назад") } })
     }
-
-}
-@Composable
-private fun TaskLineCard(line: TaskLine) {
-    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(line.productName, style = MaterialTheme.typography.titleMedium)
-        Text("План: ${QuantityFormatter.format(line.planned)} ${line.baseUnit.orEmpty()}")
-        Text("Факт: ${QuantityFormatter.format(line.actual)} · Осталось сделать: ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
-        line.plannedUnit?.let { Text("В ${line.unitName.orEmpty()}: план ${QuantityFormatter.format(it)}, факт ${line.actualUnit?.let(QuantityFormatter::format) ?: "—"}, осталось сделать ${line.remainingUnit?.let(QuantityFormatter::format) ?: "—"}") }
-        line.plannedSheets?.let { Text("Листы: план $it, факт ${line.actualSheets ?: "—"}, осталось сделать ${line.remainingSheets ?: "—"}") }
-        line.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
-    } }
 
 }

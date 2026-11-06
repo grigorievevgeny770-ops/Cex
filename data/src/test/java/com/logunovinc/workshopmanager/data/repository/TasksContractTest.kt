@@ -101,6 +101,17 @@ class TasksContractTest {
         assertEquals("1.234", value.lines.single().sheetLength?.toPlainString())
         assertEquals(1001L, value.lines.single().id)
         assertEquals(301L, value.lines.single().productId)
+        assertEquals(WorkshopRequestStage.UNSUPPORTED, value.workshopStage())
+    }
+    @Test fun legacyProgressIsReadableAndIsNotSentBackAsAStatusChange() = runBlocking {
+        server.enqueue(reply(task(type = "MANUFACTURE_PRODUCT", status = "in_progress").replace("\"created_at\":\"2026-11-01T15:00:00+03:00\"", "\"created_at\":\"2026-11-01T15:00:00+03:00\",\"started_at\":\"2026-11-02T08:00:00Z\"")))
+        val value = (repository.task(101) as Outcome.Success).value
+        val request = server.takeRequest()
+        assertEquals("in_progress", value.legacyStatus)
+        assertEquals(Instant.parse("2026-11-02T08:00:00Z"), value.startedAt)
+        assertEquals(WorkshopRequestStage.IN_PROGRESS, value.workshopStage())
+        assertFalse(request.path!!.contains("status="))
+        assertEquals("GET", request.method)
     }
     @Test fun malformedDateMapsCompatibilityNotLocalStorage() = runBlocking {
         server.enqueue(reply(task().replace("2026-11-01T15:00:00+03:00", "not-a-date")))

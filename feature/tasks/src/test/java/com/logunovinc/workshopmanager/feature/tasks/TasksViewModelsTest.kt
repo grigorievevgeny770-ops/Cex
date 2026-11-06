@@ -47,18 +47,19 @@ class TasksViewModelsTest {
         val tasks = Tasks()
         val gate = CompletableDeferred<Unit>()
         tasks.listing = { filter, _ ->
-            if (filter.type == null) withContext(NonCancellable) { gate.await(); Outcome.Success(Page(listOf(sampleTask(1)), 1, 50, 0)) }
-            else Outcome.Success(Page(listOf(sampleTask(2, type = TaskType.DISPATCH_GOODS)), 1, 50, 0))
+            if (filter.type == TaskType.MANUFACTURE_PRODUCT && filter.view == TaskView.ACTIVE) withContext(NonCancellable) { gate.await(); Outcome.Success(Page(listOf(sampleTask(1, type = TaskType.MANUFACTURE_PRODUCT)), 1, 50, 0)) }
+            else Outcome.Success(Page(listOf(sampleTask(2, type = TaskType.MANUFACTURE_PRODUCT)), 1, 50, 0))
         }
         val vm = TaskListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadTasksUseCase(tasks))
         runCurrent()
-        vm.onIntent(TaskListIntent.FilterChanged(TaskFilter(type = TaskType.DISPATCH_GOODS)))
+        vm.onIntent(TaskListIntent.FilterChanged(TaskFilter(type = TaskType.MANUFACTURE_PRODUCT, view = TaskView.HISTORY)))
         runCurrent()
         assertEquals(listOf(2L), vm.uiState.value.items.map(Task::id))
         gate.complete(Unit)
         runCurrent()
         assertEquals(listOf(2L), vm.uiState.value.items.map(Task::id))
-        assertEquals(TaskType.DISPATCH_GOODS, vm.uiState.value.filter.type)
+        assertEquals(TaskView.HISTORY, vm.uiState.value.filter.view)
+        assertEquals(TaskType.MANUFACTURE_PRODUCT, vm.uiState.value.filter.type)
     }
     @Test fun serverPaginationLoadsBeyondFiftyAndDoubleTapDoesNotDuplicatePage() = runTest(dispatcher) {
         val tasks = Tasks()
@@ -293,7 +294,7 @@ class TasksViewModelsTest {
         assertEquals(listOf(2L),vm.uiState.value.items.map(Task::id))
         gate.complete(Unit);runCurrent();assertEquals(listOf(2L),vm.uiState.value.items.map(Task::id))
         vm.onIntent(TaskListIntent.Completed("terminal-ack"));runCurrent();assertEquals(2,tasks.reads)
-        assertTrue(filters.all { it==TaskFilter() })
+        assertTrue(filters.all { it == TaskFilter(type = TaskType.MANUFACTURE_PRODUCT) })
     }
 
     @Test fun inlineRetryOfAlreadyClosedTaskUsesSavedIdOnceAndPublishesDurableTerminalAck() = runTest(dispatcher) {

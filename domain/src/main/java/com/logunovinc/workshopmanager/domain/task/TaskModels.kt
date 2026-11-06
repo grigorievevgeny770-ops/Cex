@@ -36,6 +36,8 @@ data class Task(
     val isClosedIncomplete: Boolean = false, val closedIncompleteReason: String? = null,
     val closedIncompleteBy: Long? = null, val closedIncompleteAt: Instant? = null,
     val executions: List<Execution> = emptyList(), val history: List<HistoryEntry> = emptyList(), val discrepancies: List<Discrepancy> = emptyList(),
+    /** Optional transport status. Never a reason to send a status change. */
+    val legacyStatus: String? = null, val startedAt: Instant? = null,
 ) {
     val knownWorkflow: Boolean get() = (type in setOf(TaskType.RECEIVE_GOODS, TaskType.DISPATCH_GOODS) || (type == TaskType.MANUFACTURE_PRODUCT && production?.supported == true && lines.count { it.role == "output" } == 1))
     val canExecute: Boolean get() = !isClosedIncomplete && knownWorkflow && isCompleted == false && isCancelled == false && "execute" in allowedActions

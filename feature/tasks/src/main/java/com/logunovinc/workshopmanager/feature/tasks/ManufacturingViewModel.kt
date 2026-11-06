@@ -180,10 +180,12 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
         viewModelScope.launch {
             when (val result = loadProduct(productId)) {
                 is Outcome.Success -> if (generation == catalogGeneration && uiState.value.editable && uiState.value.prototype) {
-                    if (result.value.sheet && selectedLength == null) {
+                    if (result.value.id != productId || !result.value.isFlatSheet()) {
+                        mutableState.update { it.copy(catalogError = AppError(ErrorKind.VALIDATION, "Для расхода можно выбрать только плоский лист")) }
+                    } else if (selectedLength == null) {
                         mutableState.update { it.copy(catalogError = AppError(ErrorKind.VALIDATION, "Нет остатка с известной длиной листа")) }
                     } else {
-                        addMaterial(result.value, if (result.value.sheet) selectedLength else null)
+                        addMaterial(result.value, selectedLength)
                         catalogGeneration++
                         catalogJob?.cancel()
                         mutableState.update { it.copy(catalog = emptyList(), catalogMore = false, catalogLoading = false, catalogOffset = 0) }
@@ -230,8 +232,19 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
                     }
                     is Outcome.Success -> {
                         if (generation != catalogGeneration) return@launch
-                        val present = page.value.items.filter { position -> position.quantity.signum() > 0 || position.dimensions.any { it.sheets > 0 } }
+                        val candidates = page.value.items.filter { position -> position.quantity.signum() > 0 || position.dimensions.any { it.sheets > 0 } }
+                        val present = mutableListOf<StockPosition>()
+                        var lookupFailed: AppError? = null
+                        for (position in candidates) when (val product = loadProduct(position.productId)) {
+                            is Outcome.Success -> if (product.value.id == position.productId && product.value.isFlatSheet()) present += position
+                            is Outcome.Failure -> lookupFailed = product.error
+                        }
+                        if (generation != catalogGeneration) return@launch
                         val more = page.value.hasMore && page.value.nextOffset > offset
+                        if (lookupFailed != null && present.isEmpty() && !more) {
+                            mutableState.update { it.copy(catalogLoading = false, catalogError = lookupFailed) }
+                            return@launch
+                        }
                         mutableState.update { it.copy(catalogLoading = present.isEmpty() && more,
                             catalog = (it.catalog + present).distinctBy(StockPosition::productId), catalogOffset = page.value.nextOffset, catalogMore = more) }
                         if (present.isNotEmpty() || !more) return@launch

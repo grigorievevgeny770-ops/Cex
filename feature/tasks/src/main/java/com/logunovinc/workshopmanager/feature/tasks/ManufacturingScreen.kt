@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
 import com.logunovinc.workshopmanager.core.ui.RefreshableContent
 import com.logunovinc.workshopmanager.domain.production.*
+import com.logunovinc.workshopmanager.domain.stock.isFlatSheet
 
 @Composable
 fun ManufacturingRoute(viewModel: ManufacturingViewModel, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
@@ -59,8 +60,9 @@ fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingInt
             }
             if (state.prototype) {
                 item {
-                    Text("Материалы, затраченные на прототип:", style = MaterialTheme.typography.titleLarge)
-                    OutlinedTextField(value = state.catalogQuery, onValueChange = { onIntent(ManufacturingIntent.CatalogQueryChanged(it)) }, label = { Text("Поиск материала") }, enabled = state.editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Text("Плоский лист, затраченный на прототип:", style = MaterialTheme.typography.titleLarge)
+                    Text("Другое сырьё выбрать нельзя. Готовые изделия в расход не предлагаются.")
+                    OutlinedTextField(value = state.catalogQuery, onValueChange = { onIntent(ManufacturingIntent.CatalogQueryChanged(it)) }, label = { Text("Поиск плоского листа") }, enabled = state.editable, singleLine = true, modifier = Modifier.fillMaxWidth())
                     state.catalogError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
                 }
                 items(state.catalog, key = { "catalog-${it.productId}" }) { product ->
@@ -105,7 +107,7 @@ private fun PrototypeMaterialEditor(row: PrototypeMaterialRow, enabled: Boolean,
         Text(row.product.name, style = MaterialTheme.typography.titleMedium)
         row.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
         row.definition?.fullWidth?.let { Text("Ширина ${QuantityFormatter.format(it)} м") }
-        if (!row.product.sheet) OutlinedTextField(value = row.input.quantity, onValueChange = { onChange(PrototypeMaterialField.QUANTITY, it) }, label = { Text("Потрачено, ${row.product.baseUnit}") }, enabled = enabled, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("prototype-material-qty-${row.id}"))
+        if (!row.product.isFlatSheet()) Text("Этот товар не плоский лист и в расход не входит")
         if (row.product.sheet) {
             Text("Длина листа ${row.input.sheetLength.toBigDecimalOrNull()?.let(QuantityFormatter::format) ?: "—"} м")
             OutlinedTextField(value = row.input.sheets, onValueChange = { onChange(PrototypeMaterialField.SHEETS, it) }, label = { Text("Потрачено листов") }, enabled = enabled, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())

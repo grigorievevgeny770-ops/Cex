@@ -38,14 +38,16 @@ fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit
         automaticLoading = state.loading || state.refreshing || state.loadingMore,
     ) {
     Column(Modifier.fillMaxSize().padding(start = 16.dp, top = 12.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Склад цеха", style = MaterialTheme.typography.headlineMedium)
-        OutlinedTextField(value = state.filter.query, onValueChange = { onIntent(StockListIntent.QueryChanged(it)) }, label = { Text("Найти товар") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Text("Остатки", style = MaterialTheme.typography.headlineMedium)
+        OutlinedTextField(value = state.filter.query, onValueChange = { onIntent(StockListIntent.QueryChanged(it)) }, label = { Text("Найти плоский лист") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error); TextButton(onClick = { onIntent(StockListIntent.Refresh) }) { Text("Повторить") } }
             LazyColumn(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
-                if (state.items.isEmpty() && !state.loading && state.error == null) item { Text("Позиций по этому запросу нет") }
+                item { Text("Плоский лист", style = MaterialTheme.typography.titleLarge) }
+                if (state.unverified > 0) item { Text("Часть остатков не сверена с каталогом и не показана") }
+                if (state.items.isEmpty() && !state.loading && state.error == null) item { Text("Плоского листа по этому запросу нет") }
                 items(state.items, key = StockPosition::productId) { position ->
                     Card(Modifier.fillMaxWidth().clickable { onPositionClick(position.productId) }) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(position.productName ?: "Товар", style = MaterialTheme.typography.titleMedium)
+                        Text(position.productName ?: "Плоский лист", style = MaterialTheme.typography.titleMedium)
                         StockTotals(position)
                         position.dimensions.take(3).forEach { dimension ->
                             Text("${QuantityFormatter.format(dimension.length)} м · ${dimension.sheets} листов · свободно ${dimension.freeSheets?.toString() ?: "неизвестно"}")
@@ -53,7 +55,9 @@ fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit
                         if (position.dimensions.any { it.free == null || it.freeSheets == null }) Text("Свободный остаток по размерам неизвестен")
                     } }
                 }
-                if (state.hasMore) item { OutlinedButton(onClick = { onIntent(StockListIntent.LoadMore) }, enabled = !state.loadingMore, modifier = Modifier.fillMaxWidth()) { Text(if (state.loadingMore) "Загружаем…" else "Ещё товары") } }
+                if (state.hasMore) item { OutlinedButton(onClick = { onIntent(StockListIntent.LoadMore) }, enabled = !state.loadingMore, modifier = Modifier.fillMaxWidth()) { Text(if (state.loadingMore) "Загружаем…" else "Ещё лист") } }
+                item { UnavailableStockSection("Готовая продукция, ожидающая передачи") }
+                item { UnavailableStockSection("Передано за день") }
             }
         }
     }
@@ -77,7 +81,8 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
                 Text(position?.productName ?: "Позиция склада", style = MaterialTheme.typography.headlineMedium)
                 state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
             }
-            if (position != null) {
+            if (position != null && state.flatSheet == false) item { Text("Это не плоский лист. Цех пока учитывает здесь только его.") }
+            if (position != null && state.flatSheet == true) {
                 item {
                     StockTotals(position)
                     if (position.unallocatedStock.signum() != 0 && position.dimensions.isNotEmpty()) Text("Без размера: ${QuantityFormatter.format(position.unallocatedStock)} ${position.baseUnit}")
@@ -93,6 +98,13 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
                 }
             }
         }
+    }
+}
+@Composable
+private fun UnavailableStockSection(title: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge)
+        Text("Сервер склада пока не сообщает этот список")
     }
 }
 @Composable

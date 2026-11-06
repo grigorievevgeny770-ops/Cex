@@ -11,11 +11,11 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class StockDetailUiState(val loading: Boolean = true, val refreshing: Boolean = false, val position: StockPosition? = null, val warehouse: Warehouse? = null, val error: AppError? = null)
+data class StockDetailUiState(val loading: Boolean = true, val refreshing: Boolean = false, val position: StockPosition? = null, val flatSheet: Boolean? = null, val warehouse: Warehouse? = null, val error: AppError? = null)
 sealed interface StockDetailIntent { data object Refresh : StockDetailIntent; data object PullRefresh : StockDetailIntent }
 @HiltViewModel
 class StockDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle,
-    private val resolve: ResolveWorkshopUseCase, private val load: LoadStockPositionUseCase) : ViewModel() {
+    private val resolve: ResolveWorkshopUseCase, private val load: LoadStockPositionUseCase, private val products: LoadProductUseCase) : ViewModel() {
     private val productId: Long = checkNotNull(savedStateHandle["productId"])
     private val mutableState = MutableStateFlow(StockDetailUiState())
     val uiState = mutableState.asStateFlow()
@@ -30,7 +30,10 @@ class StockDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandl
                 is Outcome.Failure -> if (request == generation) mutableState.value = StockDetailUiState(loading = false, error = warehouse.error)
                 is Outcome.Success -> when (val position = load(warehouse.value.id, productId)) {
                     is Outcome.Failure -> if (request == generation) mutableState.value = StockDetailUiState(loading = false, warehouse = warehouse.value, error = position.error)
-                    is Outcome.Success -> if (request == generation) mutableState.value = StockDetailUiState(loading = false, warehouse = warehouse.value, position = position.value)
+                    is Outcome.Success -> if (request == generation) when (val product = products(productId)) {
+                        is Outcome.Failure -> mutableState.value = StockDetailUiState(loading = false, warehouse = warehouse.value, error = product.error)
+                        is Outcome.Success -> mutableState.value = StockDetailUiState(loading = false, warehouse = warehouse.value, position = position.value, flatSheet = product.value.id == productId && product.value.isFlatSheet())
+                    }
                 }
             }
         }

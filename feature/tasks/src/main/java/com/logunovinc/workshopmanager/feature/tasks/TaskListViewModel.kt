@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 data class TaskListUiState(
     val loading: Boolean = true, val refreshing: Boolean = false, val pullRefreshing: Boolean = false, val loadingMore: Boolean = false,
-    val warehouse: Warehouse? = null, val filter: TaskFilter = TaskFilter(),
+    val warehouse: Warehouse? = null, val filter: TaskFilter = TaskFilter(type = TaskType.MANUFACTURE_PRODUCT),
     val items: List<Task> = emptyList(), val total: Long = 0, val nextOffset: Long = 0,
     val hasMore: Boolean = false, val error: AppError? = null,
 )
