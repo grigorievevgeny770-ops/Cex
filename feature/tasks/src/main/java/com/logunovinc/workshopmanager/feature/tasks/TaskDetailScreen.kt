@@ -21,7 +21,7 @@ import com.logunovinc.workshopmanager.core.ui.*
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
+fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CompletedTaskEffect(state.lastConfirmation, onCompleted)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -31,10 +31,10 @@ fun TaskDetailRoute(viewModel: TaskDetailViewModel, onReceiveClick: (Long) -> Un
             awaitCancellation()
         }
     }
-    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onDispatchClick, onManufacturingClick, onFinishReceiveClick, onRecoveryClick)
+    TaskDetailScreen(state, viewModel::onIntent, onReceiveClick, onDispatchClick, onManufacturingClick, onFinishReceiveClick)
 }
 @Composable
-fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> Unit, onReceiveClick: (Long) -> Unit, onDispatchClick: (Long) -> Unit, onManufacturingClick: (Long) -> Unit, onFinishReceiveClick: (Long) -> Unit) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val task = state.task
@@ -46,11 +46,24 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 TextButton(onClick = { onIntent(TaskDetailIntent.Refresh) }, enabled = !state.closeSending) { Text("Обновить") }
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            state.retryError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
             state.closeError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
             if (state.closeChecking) Text("Проверяем…")
             state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
             state.lastConfirmation?.let { Text("Готово", color = MaterialTheme.colorScheme.primary) }
-            state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); TextButton(onClick = onRecoveryClick) { Text("Проверить действие") } }
+            state.pending?.let { pending ->
+                Text(pending.summary.operationalTitle(), style = MaterialTheme.typography.titleMedium)
+                pending.summary.operationalLines().forEach { Text(it) }
+                if (pending.summary.comment.isNotBlank()) Text(pending.summary.comment)
+                Text(when (pending.state) {
+                    com.logunovinc.workshopmanager.domain.pending.PendingState.PREPARED -> "Сохранено перед отправкой"
+                    com.logunovinc.workshopmanager.domain.pending.PendingState.NEEDS_REVIEW -> "Требуется сверка. Не выполняйте заново"
+                    else -> "Исход неизвестен. Возможно, действие уже выполнено"
+                })
+                if (state.retryError == null) pending.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                Button(onClick = { onIntent(TaskDetailIntent.RetryPendingClick) }, enabled = !state.retrying && !state.closeSending,
+                    modifier = Modifier.testTag("task-retry-pending")) { Text(if (state.retrying) "Отправляем…" else "Повторить действие") }
+            }
             if (state.staleTask) Text("Обновите задание перед выполнением")
         }
         if (task != null) {

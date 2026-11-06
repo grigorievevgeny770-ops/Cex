@@ -87,7 +87,7 @@ class TasksViewModelsTest {
     private fun detail(tasks: Tasks, debug: Boolean = false, pending: PendingCommandRepository = object : PendingCommandRepository {
         override fun observe() = kotlinx.coroutines.flow.flowOf(emptyList<PendingCommand>())
         override suspend fun retry(commandId: String): CommandOutcome = error("unused")
-    }) = TaskDetailViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), LoadExecutionsUseCase(tasks), LoadHistoryUseCase(tasks), pending, CheckCloseIncompleteCapabilityUseCase(tasks), CloseIncompleteTaskUseCase(tasks), TaskDebugOptions(showHistoryAvailable = debug))
+    }) = TaskDetailViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), LoadExecutionsUseCase(tasks), LoadHistoryUseCase(tasks), pending, CheckCloseIncompleteCapabilityUseCase(tasks), CloseIncompleteTaskUseCase(tasks), RetryPendingCommandUseCase(pending), TaskDebugOptions(showHistoryAvailable = debug))
     @Test fun detailReadsAndAllowsDirectExecutionWithoutAnyLifecycleMutation() = runTest(dispatcher) {
         val tasks = Tasks()
         val vm = detail(tasks)
@@ -294,6 +294,45 @@ class TasksViewModelsTest {
         gate.complete(Unit);runCurrent();assertEquals(listOf(2L),vm.uiState.value.items.map(Task::id))
         vm.onIntent(TaskListIntent.Completed("terminal-ack"));runCurrent();assertEquals(2,tasks.reads)
         assertTrue(filters.all { it==TaskFilter() })
+    }
+
+    @Test fun inlineRetryOfAlreadyClosedTaskUsesSavedIdOnceAndPublishesDurableTerminalAck() = runTest(dispatcher) {
+        val tasks=Tasks();val closed=sampleTask(type=TaskType.DISPATCH_GOODS,actions=emptySet()).copy(isClosedIncomplete=true)
+        tasks.reading={ Outcome.Success(closed) }
+        val saved=PendingCommand("original",101,"CLOSE_INCOMPLETE",CommandSummary("Закрытие",listOf("Материал: 4 шт"),"Исходная причина"),PendingState.UNKNOWN,Instant.EPOCH,1)
+        val commands=kotlinx.coroutines.flow.MutableStateFlow(listOf(saved))
+        val gate=CompletableDeferred<Unit>();var attempts=0
+        val ack=CommandConfirmation(saved.id,101,9,null,true,terminal=true)
+        val repository=object:PendingCommandRepository {
+            override fun observe()=commands
+            override suspend fun retry(commandId:String):CommandOutcome {
+                assertEquals(saved.id,commandId);attempts++;gate.await()
+                commands.value=listOf(saved.copy(state=PendingState.ACKNOWLEDGED,confirmation=ack))
+                return CommandOutcome.Confirmed(ack)
+            }
+        }
+        val vm=detail(tasks,pending=repository);runCurrent()
+        assertFalse(vm.uiState.value.executionAvailable);assertNull(vm.uiState.value.lastConfirmation)
+        vm.onIntent(TaskDetailIntent.RetryPendingClick);vm.onIntent(TaskDetailIntent.RetryPendingClick);runCurrent()
+        assertTrue(vm.uiState.value.retrying);assertEquals(1,attempts)
+        gate.complete(Unit);runCurrent()
+        assertEquals(ack,vm.uiState.value.lastConfirmation);assertNull(vm.uiState.value.pending);assertFalse(vm.uiState.value.retrying)
+        assertEquals(2,tasks.taskCalls);assertFalse(vm.uiState.value.closeAvailable)
+    }
+    @Test fun inlineRetryWorksWithoutTaskReadAndRejectionStaysVisibleAfterSlotRelease() = runTest(dispatcher) {
+        val tasks=Tasks();tasks.reading={ Outcome.Failure(AppError(ErrorKind.NOT_FOUND,"Недоступно")) }
+        val saved=PendingCommand("prepared",101,"RECEIVE_GOODS",CommandSummary("Приёмка",listOf("Материал: 4 шт")),PendingState.PREPARED,Instant.EPOCH,0)
+        val archived=saved.copy(id="old",state=PendingState.ACKNOWLEDGED,confirmation=CommandConfirmation("old",101,4,null,false,terminal=true))
+        val commands=kotlinx.coroutines.flow.MutableStateFlow(listOf(archived));var attempts=0
+        val repository=object:PendingCommandRepository {
+            override fun observe()=commands
+            override suspend fun retry(commandId:String):CommandOutcome { attempts++;commands.value=emptyList();return CommandOutcome.Rejected(null,AppError(ErrorKind.FORBIDDEN,"Права изменились")) }
+        }
+        val vm=detail(tasks,pending=repository);runCurrent();assertNull(vm.uiState.value.lastConfirmation)
+        commands.value=listOf(archived,saved);runCurrent();assertNull(vm.uiState.value.task)
+        vm.onIntent(TaskDetailIntent.RetryPendingClick);runCurrent()
+        assertEquals(1,attempts);assertNull(vm.uiState.value.pending);assertEquals("Права изменились",vm.uiState.value.retryError?.message)
+        vm.onIntent(TaskDetailIntent.RetryPendingClick);runCurrent();assertEquals(1,attempts)
     }
 
 }

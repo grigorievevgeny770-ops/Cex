@@ -58,3 +58,5 @@ Normal UI no longer renders transport IDs/versions/documents or raw journal labe
 
 ## Completion navigation after durable ACK
 CommandConfirmation exposes a presentation-independent terminal flag derived only from the persisted ACK's current task.is_completed/is_closed_incomplete (legacy status=completed only when both new completion flags are absent). Historical result flags, remaining quantities, preview and GET alone never manufacture success. ACK schema fields are read-only additions; exact saved request method/body/token/profile and Room schema do not change. An ACK save failure remains unresolved and cannot navigate. New forms submit an empty compatible comment; saved older commands retain their original comments and bytes.
+
+2026-11-06: removal of global recovery UI changes only navigation/presentation. Manual retry by saved command ID now lives on task detail; Task.canExecute is not required for this read/replay of the already confirmed intent. Raw bytes/token/server/actor, acknowledgement persistence, terminal navigation and shared dispatcher mutex remain unchanged.

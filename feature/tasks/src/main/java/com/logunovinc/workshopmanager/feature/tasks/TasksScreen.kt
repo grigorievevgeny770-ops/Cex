@@ -20,7 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 @Composable
-fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, onRecoveryClick: () -> Unit, consumeCompletion: () -> String? = { null }) {
+fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, consumeCompletion: () -> String? = { null }) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val completion by rememberUpdatedState(consumeCompletion)
@@ -31,16 +31,15 @@ fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, onR
             while (isActive) { delay(30_000); viewModel.onIntent(TaskListIntent.Poll) }
         }
     }
-    TaskListScreen(state, viewModel::onIntent, onTaskClick, onRecoveryClick)
+    TaskListScreen(state, viewModel::onIntent, onTaskClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, onTaskClick: (Long) -> Unit, onRecoveryClick: () -> Unit) {
+fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, onTaskClick: (Long) -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Задания", style = MaterialTheme.typography.headlineMedium)
-            TextButton(onClick = onRecoveryClick) { Text("Проверка действий") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(TaskView.ACTIVE to "Доступные", TaskView.HISTORY to "История заданий").forEach { (view, title) ->

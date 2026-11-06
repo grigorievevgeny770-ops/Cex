@@ -9,6 +9,6 @@ fun CommandSummary.operationalLines(): List<String> = lines.filterNot { it.match
     .map { it.replace(Regex(" · строка №[0-9]+"), "") }
 fun AppError.operationalMessage(): String = when(code) {
     "DOCUMENT_STATE_CONFLICT", "RECIPE_VERSION_CONFLICT" -> "Задание изменилось. Обновите данные и проверьте количество"
-    "IDEMPOTENCY_CONFLICT" -> "Не удалось сверить действие. Откройте неподтверждённые действия"
+    "IDEMPOTENCY_CONFLICT" -> "Нужна сверка сохранённого действия. Не выполняйте заново"
     else -> message
 }

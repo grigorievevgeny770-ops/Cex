@@ -17,7 +17,7 @@ data class CloseIncompleteDialog(val task: Task, val reason: String = "")
 data class TaskDetailUiState(
     val loading: Boolean = true, val task: Task? = null, val error: AppError? = null,
     val lastConfirmation: CommandConfirmation? = null, val staleTask: Boolean = false,
-    val pending: PendingCommand? = null,
+    val pending: PendingCommand? = null, val retrying: Boolean = false, val retryError: AppError? = null,
     val closeDialog: CloseIncompleteDialog? = null, val closeChecking: Boolean = false,
     val closeSending: Boolean = false, val closeError: AppError? = null,
     val executions: List<Execution> = emptyList(), val executionsLoading: Boolean = false,
@@ -26,14 +26,15 @@ data class TaskDetailUiState(
     val history: List<HistoryEntry> = emptyList(), val historyLoading: Boolean = false,
     val historyOffset: Long = 0, val historyMore: Boolean = false, val historyError: AppError? = null,
 ) {
-    val executionAvailable: Boolean get() = !loading && !staleTask && pending == null && !closeSending && !closeChecking && closeDialog == null && task?.canExecute == true
-    val closeAvailable: Boolean get() = !loading && !staleTask && pending == null && !closeSending && !closeChecking && closeDialog == null && task?.canCloseIncomplete == true
+    val executionAvailable: Boolean get() = !loading && !staleTask && !retrying && pending == null && !closeSending && !closeChecking && closeDialog == null && task?.canExecute == true
+    val closeAvailable: Boolean get() = !loading && !staleTask && !retrying && pending == null && !closeSending && !closeChecking && closeDialog == null && task?.canCloseIncomplete == true
 }
 sealed interface TaskDetailIntent {
     data object CloseIncompleteClick : TaskDetailIntent
     data class CloseReasonChanged(val value: String) : TaskDetailIntent
     data object DismissClose : TaskDetailIntent
     data object ConfirmClose : TaskDetailIntent
+    data object RetryPendingClick : TaskDetailIntent
     data object Refresh : TaskDetailIntent
     data object LoadMoreExecutions : TaskDetailIntent
     data object ToggleDebugHistory : TaskDetailIntent
@@ -46,6 +47,7 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
     pending: PendingCommandRepository,
     private val checkCloseCapability: CheckCloseIncompleteCapabilityUseCase,
     private val closeIncomplete: CloseIncompleteTaskUseCase,
+    private val retryPending: RetryPendingCommandUseCase,
     debugOptions: TaskDebugOptions = TaskDebugOptions(),
 ) : ViewModel() {
     private val taskId: Long = checkNotNull(savedStateHandle["taskId"])
@@ -60,13 +62,14 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             val unresolvedId = current.pending?.id
             val recovered = commands.firstOrNull { it.id == unresolvedId && it.state == PendingState.ACKNOWLEDGED }?.confirmation
             val blocked = commands.firstOrNull { it.taskId == taskId && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
-            mutableState.update { it.copy(pending = blocked, lastConfirmation = recovered ?: it.lastConfirmation, closeError = if (recovered != null) null else it.closeError) }
+            mutableState.update { it.copy(pending = blocked, lastConfirmation = recovered ?: it.lastConfirmation, closeError = if (recovered != null) null else it.closeError, retryError = if (recovered != null) null else it.retryError) }
             if (recovered != null) refresh()
         } }
         refresh()
     }
     fun onIntent(intent: TaskDetailIntent) {
         when (intent) {
+            TaskDetailIntent.RetryPendingClick -> retrySaved()
             TaskDetailIntent.CloseIncompleteClick -> openClose()
             is TaskDetailIntent.CloseReasonChanged -> if (!uiState.value.closeSending) mutableState.update { it.copy(closeDialog = it.closeDialog?.copy(reason = intent.value), closeError = null) }
             TaskDetailIntent.DismissClose -> if (!uiState.value.closeSending) mutableState.update { it.copy(closeDialog = null, closeError = null) }
@@ -75,6 +78,28 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             TaskDetailIntent.LoadMoreExecutions -> executions(reset = false)
             TaskDetailIntent.ToggleDebugHistory -> toggleDebugHistory()
             TaskDetailIntent.LoadMoreHistory -> history(reset = false)
+        }
+    }
+    private fun retrySaved() {
+        val state = uiState.value
+        val pending = state.pending ?: return
+        if (state.retrying || state.closeSending) return
+        mutableState.update { it.copy(retrying = true, retryError = null) }
+        viewModelScope.launch {
+            try {
+                when (val result = retryPending(pending.id)) {
+                    is CommandOutcome.Confirmed -> {
+                        val alreadyRead = uiState.value.lastConfirmation?.commandId == result.confirmation.commandId
+                        mutableState.update { it.copy(lastConfirmation = result.confirmation, pending = if (it.pending?.id == pending.id) null else it.pending, retryError = null) }
+                        if (!alreadyRead) refresh()
+                    }
+                    is CommandOutcome.Unresolved -> mutableState.update { it.copy(pending = result.command, retryError = result.error) }
+                    is CommandOutcome.Rejected -> {
+                        mutableState.update { it.copy(retryError = result.error) }
+                        refresh()
+                    }
+                }
+            } finally { mutableState.update { it.copy(retrying = false) } }
         }
     }
     private fun openClose() {

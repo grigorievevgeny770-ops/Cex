@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 810 437 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 767 389 байт.
 
-SHA256: `d028f1c21077333945856f9330b76a0683551a344b28c7e4ee429e4827821746`.
+SHA256: `297f3b2a2f051565200af8db0e1ea8eaad91424e790cde16f8b36003b833896e`.
 
 APK установлен и запущен на emulator-5554/API37. Debug/release default: `https://147-45-154-211.sslip.io/` (saved environment takes precedence). SDK/JDK и настройка окружений — в README.md.
 
@@ -130,3 +130,7 @@ Actual process-death UI proof: /tmp/tseh-simple-ui-process-recovery3/result.json
 135unit/11connected,0 failures/errors/skips; lint/assembleDebug: /tmp/tseh-terminal-ack-final-verify3.log. Root independently ran scripts/verify.sh: /tmp/tseh-terminal-ack-root-verify.log PASS and re-counted XML135/11. UI: delayed ACK leaves page until body received, exactly one list reload after completion; background ACK consumed on resume, rotation no duplicate command/navigation; 500 unknown stays. Room ACK-save failure remains unresolved and exact retry recovers terminal receipt.
 
 Actual backend baseline /tmp/tseh-terminal-ack-real-baseline/result.json PASS (terminal receive/full dispatch return, partial fixed/prototype stay,6 facts/stock43/0/5). Actual close5 /tmp/tseh-terminal-ack-real-close2/result.json PASS (all5return/freshlist/cardgone; history card stays, accounting unchanged/stock30/3/2). These writes use owned synthetic SQLite fixtures only; shared database is untouched.
+
+## 2026-11-06 — без отдельного экрана проверки
+Удалён экран проверки действий и все его пользовательские переходы. Pending-журнал/ACK сохраняются; безопасный ручной retry находится в карточке задания, включая уже закрытое задание с потерянным ответом. Формы ведут обратно к заданию. Старый route identifier сохранён только как невидимый redirect для совместимого восстановления NavController, без screen/VM/кнопок.
+Новые unit-проверки охватывают закрытый task, task GET failure, двойное нажатие, terminal ACK, ошибку после снятия pending и отсутствие перехода по старому ACK. MWS Compose inline retry сравнивает точные байты двух попыток. Manual instrumentation suite /tmp/tseh-remove-recovery-manual-ui2.log:15 tests PASS (включая3 ранее незакоммиченные проверки кликов). Набор данного коммита содержит12 device-тестов;3 старые локальные проверки не включены. Unit/lint/build /tmp/tseh-remove-recovery-final-verify3.log и независимый root /tmp/tseh-remove-recovery-root-verify.log. Debug build /tmp/tseh-remove-recovery-debug-build.log SUCCESS. Process-death driver адаптирован на прямой вход в task, но новый physical force-stop run в этом этапе не запускался; предыдущие process-proof отчёты относятся к старому UI.

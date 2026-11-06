@@ -19,13 +19,13 @@ import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun DispatchExecutionRoute(viewModel: DispatchExecutionViewModel, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
+fun DispatchExecutionRoute(viewModel: DispatchExecutionViewModel, onDetailClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CompletedTaskEffect((state.result as? ExecutionResultState.Confirmed)?.receipt, onCompleted)
-    DispatchExecutionScreen(state, viewModel::onIntent, onRecoveryClick, onDetailClick)
+    DispatchExecutionScreen(state, viewModel::onIntent, onDetailClick)
 }
 @Composable
-fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (DispatchExecutionIntent) -> Unit, onRecoveryClick: () -> Unit, onDetailClick: () -> Unit) {
+fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (DispatchExecutionIntent) -> Unit, onDetailClick: () -> Unit) {
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val task = state.task
@@ -37,12 +37,12 @@ fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (Dispatch
             state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
             when (val result = state.result) {
                 is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary); Text("Товар в пути"); TextButton(onClick = onDetailClick) { Text("К заданию") } }
-                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error); TextButton(onClick = onRecoveryClick) { Text("Проверить действие") } }
+                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error); if (state.pending == null) TextButton(onClick = onDetailClick) { Text("К заданию") } }
                 is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
                 ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
                 else -> Unit
             }
-            state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) }; TextButton(onClick = onRecoveryClick) { Text("Проверить действие") } }
+            state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) }; TextButton(onClick = onDetailClick) { Text("К заданию") } }
             if (task != null && !task.canExecute) Text("Отправка недоступна")
         }
         items(task?.lines.orEmpty(), key = TaskLine::id) { line ->

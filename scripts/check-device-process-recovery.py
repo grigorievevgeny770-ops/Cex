@@ -126,17 +126,17 @@ try:
     attempts_before_restart = len(json.loads((output / 'state.json').read_text())['attempts'])
     (output / 'allow-reply').write_text('Only explicit retry may now receive its duplicate ACK.')
     device('shell', 'am', 'start', '-W', '-n', component)
-    find('Проверка действий', scroll=True)
+    find('Приёмка', scroll=True, exact=True)
     after_restart = wait_state(lambda s: s['physical_executions'] == 1)
     assert len(after_restart['attempts']) == attempts_before_restart, 'Launch automatically replayed a stock command'
     new_pid = device('shell', 'pidof', package).decode().strip()
     assert new_pid and new_pid != previous_pid, 'Expected a new app process'
-    click(find('Проверка действий'))
+    click(find('Приёмка', scroll=True, exact=True))
     find('Исход неизвестен', scroll=True)
     screenshot('after-cold-restart-pending')
     click(find('Повторить действие', scroll=True))
     final = wait_state(lambda s: len(s['attempts']) > attempts_before_restart)
-    find('Подтверждено сервером', scroll=True)
+    find('Готово', scroll=True, exact=True)
     assert final['physical_executions'] == 1
     assert final['accepted'] == 4
     assert all(a['body'] == first['attempts'][0]['body'] for a in final['attempts'])
