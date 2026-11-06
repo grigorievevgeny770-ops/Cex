@@ -6,7 +6,7 @@
 
 `app/build/outputs/apk/debug/app-debug.apk` — 14 767 389 байт.
 
-SHA256: `297f3b2a2f051565200af8db0e1ea8eaad91424e790cde16f8b36003b833896e`.
+SHA256: `dfada4e28e358334987e99075d2542292783a2cbe9f5c8b50f4255a8a370cf98`.
 
 APK установлен и запущен на emulator-5554/API37. Debug/release default: `https://147-45-154-211.sslip.io/` (saved environment takes precedence). SDK/JDK и настройка окружений — в README.md.
 
@@ -134,3 +134,7 @@ Actual backend baseline /tmp/tseh-terminal-ack-real-baseline/result.json PASS (t
 ## 2026-11-06 — без отдельного экрана проверки
 Удалён экран проверки действий и все его пользовательские переходы. Pending-журнал/ACK сохраняются; безопасный ручной retry находится в карточке задания, включая уже закрытое задание с потерянным ответом. Формы ведут обратно к заданию. Старый route identifier сохранён только как невидимый redirect для совместимого восстановления NavController, без screen/VM/кнопок.
 Новые unit-проверки охватывают закрытый task, task GET failure, двойное нажатие, terminal ACK, ошибку после снятия pending и отсутствие перехода по старому ACK. MWS Compose inline retry сравнивает точные байты двух попыток. Manual instrumentation suite /tmp/tseh-remove-recovery-manual-ui2.log:15 tests PASS (включая3 ранее незакоммиченные проверки кликов). Набор данного коммита содержит12 device-тестов;3 старые локальные проверки не включены. Unit/lint/build /tmp/tseh-remove-recovery-final-verify3.log и независимый root /tmp/tseh-remove-recovery-root-verify.log. Debug build /tmp/tseh-remove-recovery-debug-build.log SUCCESS. Process-death driver адаптирован на прямой вход в task, но новый physical force-stop run в этом этапе не запускался; предыдущие process-proof отчёты относятся к старому UI.
+
+## 2026-11-06 — pull-to-refresh и один возврат
+Кнопки «Обновить» заменены жестом на пяти detail/execution экранах; существующие жесты списков сохранены. Общий Material3 контейнер действительно отключает gesture при write/retry/close/review; manual-refresh indicator не пересоздаёт список. Ввод количества/причины/материалов сохраняется, read не создаёт POST. Кнопки «К заданию» удалены, возврат — тулбаром/системным «Назад».
+До нового пользовательского ограничения прошли138unit/lint/assemble (/tmp/tseh-pull-refresh-final-verify3.log), independent root verify (/tmp/tseh-pull-refresh-root-verify.log),17manualUI (/tmp/tseh-pull-refresh-manual-ui.log). Из17 три старые локальные проверки кликов не входят в коммит; в репозитории14device cases. Два новых физических swipe cases проверили один GET, сохранение ввода, блокировку во время отправки и stock4→7 без POST. После указания «тесты только по просьбе» запусков нет; дальнейшая политика в AGENTS.md. VPN/network/auth code на этом этапе не менялся.

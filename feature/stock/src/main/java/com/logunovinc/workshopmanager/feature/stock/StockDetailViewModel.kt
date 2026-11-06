@@ -11,7 +11,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class StockDetailUiState(val loading: Boolean = true, val position: StockPosition? = null, val warehouse: Warehouse? = null, val error: AppError? = null)
+data class StockDetailUiState(val loading: Boolean = true, val refreshing: Boolean = false, val position: StockPosition? = null, val warehouse: Warehouse? = null, val error: AppError? = null)
 sealed interface StockDetailIntent { data object Refresh : StockDetailIntent }
 @HiltViewModel
 class StockDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle,
@@ -21,10 +21,10 @@ class StockDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandl
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
     init { refresh() }
-    fun onIntent(intent: StockDetailIntent) { when (intent) { StockDetailIntent.Refresh -> refresh() } }
-    private fun refresh() {
+    fun onIntent(intent: StockDetailIntent) { when (intent) { StockDetailIntent.Refresh -> if (!uiState.value.loading) refresh(manual = true) } }
+    private fun refresh(manual: Boolean = false) {
         val request = ++generation
-        mutableState.update { it.copy(loading = true, error = null) }
+        mutableState.update { it.copy(loading = true, refreshing = manual, error = null) }
         viewModelScope.launch {
             when (val warehouse = resolve()) {
                 is Outcome.Failure -> if (request == generation) mutableState.value = StockDetailUiState(loading = false, error = warehouse.error)

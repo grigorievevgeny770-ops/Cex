@@ -16,72 +16,74 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
+import com.logunovinc.workshopmanager.core.ui.RefreshableContent
 import com.logunovinc.workshopmanager.domain.production.*
 
 @Composable
-fun ManufacturingRoute(viewModel: ManufacturingViewModel, onDetailClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
+fun ManufacturingRoute(viewModel: ManufacturingViewModel, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CompletedTaskEffect((state.result as? ExecutionResultState.Confirmed)?.receipt, onCompleted)
-    ManufacturingScreen(state, viewModel::onIntent, onDetailClick)
+    ManufacturingScreen(state, viewModel::onIntent)
 }
 @Composable
-fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingIntent) -> Unit, onDetailClick: () -> Unit) {
+fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingIntent) -> Unit) {
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val task = state.task
     val output = task?.lines?.filter { it.role == "output" }?.singleOrNull()
-    LazyColumn(Modifier.fillMaxSize().testTag("manufacturing-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("Изготовление", style = MaterialTheme.typography.headlineMedium)
-            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
-            when (val result = state.result) {
-                is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary); TextButton(onClick = onDetailClick) { Text("К заданию") } }
-                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error); if (state.pending == null) TextButton(onClick = onDetailClick) { Text("К заданию") } }
-                is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
-                ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                else -> Unit
-            }
-            state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) }; TextButton(onClick = onDetailClick) { Text("К заданию") } }
-            if (task?.production?.supported != true || output == null) Text("Нужна настройка производства. Обратитесь к руководителю")
-            if (output != null) {
-                Text(output.productName, style = MaterialTheme.typography.titleLarge)
-                Text("План ${QuantityFormatter.format(output.planned)} · изготовлено ${QuantityFormatter.format(output.actual)} · осталось ${QuantityFormatter.format(output.remaining)} ${output.baseUnit.orEmpty()}")
-                if (state.prototype) Text("Первый выпуск: укажите расход материалов. Он войдёт в план и задаст расход следующих партий")
-                else Text("Укажите, сколько изготовить")
-                val sheets = output.plannedSheets != null || output.remainingSheets != null
-                if (sheets) {
-                    Text("Осталось ${output.remainingSheets ?: "—"} листов изделия")
-                    OutlinedTextField(value = state.output?.sheets.orEmpty(), onValueChange = { onIntent(ManufacturingIntent.OutputSheetsChanged(it)) }, label = { Text("Фактически изготовлено листов") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                } else OutlinedTextField(value = state.output?.quantity.orEmpty(), onValueChange = { onIntent(ManufacturingIntent.OutputQuantityChanged(it)) }, label = { Text("Фактически изготовлено, ${output.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("manufacturing-output-qty"))
-            }
-        }
-        if (state.prototype) {
+    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(ManufacturingIntent.Refresh) }) {
+        LazyColumn(Modifier.fillMaxSize().testTag("manufacturing-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                Text("Материалы первого выпуска", style = MaterialTheme.typography.titleLarge)
-                Text("Добавьте потраченные материалы")
-                OutlinedTextField(value = state.catalogQuery, onValueChange = { onIntent(ManufacturingIntent.CatalogQueryChanged(it)) }, label = { Text("Поиск материала") }, enabled = state.editable, singleLine = true, modifier = Modifier.fillMaxWidth())
-                TextButton(onClick = { onIntent(ManufacturingIntent.SearchCatalog) }, enabled = state.editable && !state.catalogLoading) { Text("Найти материалы") }
-                if (state.catalogLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                state.catalogError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                Text("Изготовление", style = MaterialTheme.typography.headlineMedium)
+                if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                when (val result = state.result) {
+                    is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary) }
+                    is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error) }
+                    is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
+                    ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    else -> Unit
+                }
+                state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) } }
+                if (task?.production?.supported != true || output == null) Text("Нужна настройка производства. Обратитесь к руководителю")
+                if (output != null) {
+                    Text(output.productName, style = MaterialTheme.typography.titleLarge)
+                    Text("План ${QuantityFormatter.format(output.planned)} · изготовлено ${QuantityFormatter.format(output.actual)} · осталось ${QuantityFormatter.format(output.remaining)} ${output.baseUnit.orEmpty()}")
+                    if (state.prototype) Text("Первый выпуск: укажите расход материалов. Он войдёт в план и задаст расход следующих партий")
+                    else Text("Укажите, сколько изготовить")
+                    val sheets = output.plannedSheets != null || output.remainingSheets != null
+                    if (sheets) {
+                        Text("Осталось ${output.remainingSheets ?: "—"} листов изделия")
+                        OutlinedTextField(value = state.output?.sheets.orEmpty(), onValueChange = { onIntent(ManufacturingIntent.OutputSheetsChanged(it)) }, label = { Text("Фактически изготовлено листов") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                    } else OutlinedTextField(value = state.output?.quantity.orEmpty(), onValueChange = { onIntent(ManufacturingIntent.OutputQuantityChanged(it)) }, label = { Text("Фактически изготовлено, ${output.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("manufacturing-output-qty"))
+                }
             }
-            items(state.catalog, key = { "catalog-${it.id}" }) { product ->
-                OutlinedButton(onClick = { onIntent(ManufacturingIntent.AddMaterial(product)) }, modifier = Modifier.testTag("prototype-add-${product.id}"), enabled = state.editable) { Text("Добавить ${product.name}") }
+            if (state.prototype) {
+                item {
+                    Text("Материалы первого выпуска", style = MaterialTheme.typography.titleLarge)
+                    Text("Добавьте потраченные материалы")
+                    OutlinedTextField(value = state.catalogQuery, onValueChange = { onIntent(ManufacturingIntent.CatalogQueryChanged(it)) }, label = { Text("Поиск материала") }, enabled = state.editable, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    TextButton(onClick = { onIntent(ManufacturingIntent.SearchCatalog) }, enabled = state.editable && !state.catalogLoading) { Text("Найти материалы") }
+                    if (state.catalogLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    state.catalogError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                }
+                items(state.catalog, key = { "catalog-${it.id}" }) { product ->
+                    OutlinedButton(onClick = { onIntent(ManufacturingIntent.AddMaterial(product)) }, modifier = Modifier.testTag("prototype-add-${product.id}"), enabled = state.editable) { Text("Добавить ${product.name}") }
+                }
+                if (state.catalogMore) item { TextButton(onClick = { onIntent(ManufacturingIntent.MoreCatalog) }, enabled = state.editable && !state.catalogLoading) { Text("Ещё товары каталога") } }
+                items(state.materials, key = PrototypeMaterialRow::id) { row ->
+                    PrototypeMaterialEditor(row, state.editable, { field, value -> onIntent(ManufacturingIntent.MaterialChanged(row.id, field, value)) }, { onIntent(ManufacturingIntent.RemoveMaterial(row.id)) })
+                }
             }
-            if (state.catalogMore) item { TextButton(onClick = { onIntent(ManufacturingIntent.MoreCatalog) }, enabled = state.editable && !state.catalogLoading) { Text("Ещё товары каталога") } }
-            items(state.materials, key = PrototypeMaterialRow::id) { row ->
-                PrototypeMaterialEditor(row, state.editable, { field, value -> onIntent(ManufacturingIntent.MaterialChanged(row.id, field, value)) }, { onIntent(ManufacturingIntent.RemoveMaterial(row.id)) })
+            item {
+                Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ManufacturingIntent.PreviewClick) }, modifier = Modifier.fillMaxWidth().testTag("manufacturing-preview"), enabled = state.editable && !state.previewLoading) { Text(if (state.previewLoading) "Рассчитываем…" else "Рассчитать расход") }
+                if (state.previewLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            state.binding?.preview?.let { preview ->
+                item { ManufacturingPreviewSummary(preview) }
+                item { Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ManufacturingIntent.ReviewClick) }, modifier = Modifier.fillMaxWidth().testTag("manufacturing-review"), enabled = state.editable && preview.canExecute && !state.previewLoading) { Text("Изготовить") } }
             }
         }
-        item {
-            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ManufacturingIntent.PreviewClick) }, modifier = Modifier.fillMaxWidth().testTag("manufacturing-preview"), enabled = state.editable && !state.previewLoading) { Text(if (state.previewLoading) "Рассчитываем…" else "Рассчитать расход") }
-            if (state.previewLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
-        state.binding?.preview?.let { preview ->
-            item { ManufacturingPreviewSummary(preview) }
-            item { Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ManufacturingIntent.ReviewClick) }, modifier = Modifier.fillMaxWidth().testTag("manufacturing-review"), enabled = state.editable && preview.canExecute && !state.previewLoading) { Text("Изготовить") } }
-        }
-        item { TextButton(onClick = { onIntent(ManufacturingIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить") } }
     }
     if (state.reviewOpen) state.binding?.preview?.let { preview ->
         AlertDialog(onDismissRequest = { onIntent(ManufacturingIntent.DismissReview) }, title = { Text(if (state.prototype) "Подтвердить первый прототип?" else "Подтвердить выпуск?") },

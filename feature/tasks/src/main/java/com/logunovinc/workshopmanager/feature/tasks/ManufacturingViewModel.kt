@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 data class PrototypeMaterialRow(val id: Long, val product: Product, val input: PrototypeMaterialInput,
     val definition: StockDefinition? = null, val loading: Boolean = true, val error: AppError? = null)
 data class ManufacturingPreviewBinding(val command: ManufacturingCommand, val preview: ManufacturingPreview, val revision: Long)
-data class ManufacturingUiState(val loading: Boolean = true, val stale: Boolean = true, val task: Task? = null,
+data class ManufacturingUiState(val loading: Boolean = true, val refreshing: Boolean = false, val stale: Boolean = true, val task: Task? = null,
     val output: ActualLineInput? = null, val materials: List<PrototypeMaterialRow> = emptyList(),
     val previewLoading: Boolean = false, val binding: ManufacturingPreviewBinding? = null, val reviewOpen: Boolean = false,
     val result: ExecutionResultState = ExecutionResultState.Idle, val pending: PendingCommand? = null, val error: AppError? = null,
@@ -25,6 +25,7 @@ data class ManufacturingUiState(val loading: Boolean = true, val stale: Boolean 
     val catalogOffset: Long = 0, val catalogMore: Boolean = false, val catalogError: AppError? = null,
 ) {
     val prototype: Boolean get() = task?.production?.status == RecipeStatus.AWAITING_PROTOTYPE
+    val canRefresh: Boolean get() = !loading && result != ExecutionResultState.Sending && !previewLoading && !reviewOpen
     val editable: Boolean get() = !loading && !stale && task?.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute &&
         result != ExecutionResultState.Sending && result !is ExecutionResultState.Unresolved && pending == null && !reviewOpen
 }
@@ -103,7 +104,7 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
             ManufacturingIntent.ReviewClick -> if (current.editable && current.binding?.revision == revision && current.binding.preview.canExecute) mutableState.update { it.copy(reviewOpen = true) }
             ManufacturingIntent.DismissReview -> if (current.result != ExecutionResultState.Sending) mutableState.update { it.copy(reviewOpen = false) }
             ManufacturingIntent.ConfirmClick -> confirm()
-            ManufacturingIntent.Refresh -> if (current.result != ExecutionResultState.Sending) refresh(reset = false)
+            ManufacturingIntent.Refresh -> if (current.canRefresh) refresh(reset = false, manual = true)
         }
     }
     private fun draft(state: ManufacturingUiState): ManufacturingDraft? = state.output?.let { ManufacturingDraft(it, if (state.prototype) state.materials.map(PrototypeMaterialRow::input) else emptyList()) }
@@ -146,17 +147,17 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
             }
         }
     }
-    private fun refresh(reset: Boolean, operationError: AppError? = null) {
+    private fun refresh(reset: Boolean, operationError: AppError? = null, manual: Boolean = false) {
         invalidatePreview()
         val generation = ++loadGeneration
-        mutableState.update { it.copy(loading = true, stale = true, error = operationError) }
+        mutableState.update { it.copy(loading = true, refreshing = manual, stale = true, error = operationError) }
         viewModelScope.launch {
             when (val task = loadTask(taskId)) {
-                is Outcome.Failure -> if (generation == loadGeneration) mutableState.update { it.copy(loading = false, error = task.error) }
+                is Outcome.Failure -> if (generation == loadGeneration) mutableState.update { it.copy(loading = false, refreshing = false, error = task.error) }
                 is Outcome.Success -> if (generation == loadGeneration) mutableState.update { state ->
                     val output = task.value.lines.filter { it.role == "output" }.singleOrNull()
                     val prototype = task.value.production?.status == RecipeStatus.AWAITING_PROTOTYPE
-                    state.copy(loading = false, stale = false, task = task.value,
+                    state.copy(loading = false, refreshing = false, stale = false, task = task.value,
                         output = output?.let { line -> if (!reset && state.output?.taskLineId == line.id) state.output else ActualLineInput(line.id) },
                         materials = if (reset || !prototype) emptyList() else state.materials)
                 }

@@ -23,6 +23,7 @@ class ManufacturingViewModelTest {
         override suspend fun closeIncompleteCapability(): Outcome<Boolean> = error("unused")
         override suspend fun closeIncomplete(task: Task, reason: String): com.logunovinc.workshopmanager.domain.pending.CommandOutcome = error("unused")
         var current = productionTask()
+        var reads=0
         var previewCalls = 0
         var writes = 0
         val submitted = mutableListOf<ManufacturingCommand>()
@@ -33,7 +34,7 @@ class ManufacturingViewModelTest {
                 production = ready.production!!.copy(basisOutput = RecipeOutput(BigDecimal("2"), null, "шт", null), materials = listOf(RecipeMaterial(301, "Материал", null, BigDecimal("4"), null, null, "шт", null, null)))) }
             CommandOutcome.Confirmed(CommandConfirmation("saved", task.id, 3, 5001, false))
         }
-        override suspend fun task(id: Long): Outcome<Task> = Outcome.Success(current)
+        override suspend fun task(id: Long): Outcome<Task> { reads++;return Outcome.Success(current) }
         override suspend fun manufacturingPreview(task: Task, command: ManufacturingCommand): Outcome<ManufacturingPreview> { previewCalls++; return previewing(task, command) }
         override suspend fun manufacture(task: Task, command: ManufacturingCommand, preview: ManufacturingPreview, comment: String): CommandOutcome { writes++; submitted += command; return writing(task, command) }
         override suspend fun dispatch(task: Task, command: DispatchCommand): CommandOutcome = error("unused")
@@ -161,4 +162,15 @@ class ManufacturingViewModelTest {
         assertFalse(vm.uiState.value.editable)
         assertEquals(1, tasks.previewCalls)
     }
+    @Test fun pullRefreshKeepsPrototypeMaterialsAndCannotDiscardOpenReview() = runTest(dispatcher) {
+        val tasks=Tasks().apply { current=productionTask(prototype=true) };val vm=vm(tasks)
+        runCurrent();prototypeInput(vm);runCurrent()
+        val materials=vm.uiState.value.materials
+        vm.onIntent(ManufacturingIntent.Refresh);vm.onIntent(ManufacturingIntent.Refresh);runCurrent()
+        assertEquals(2,tasks.reads);assertEquals("2",vm.uiState.value.output?.quantity);assertEquals(materials,vm.uiState.value.materials);assertEquals(0,tasks.writes)
+        vm.onIntent(ManufacturingIntent.PreviewClick);runCurrent();vm.onIntent(ManufacturingIntent.ReviewClick)
+        vm.onIntent(ManufacturingIntent.Refresh);runCurrent()
+        assertTrue(vm.uiState.value.reviewOpen);assertEquals(2,tasks.reads);assertNotNull(vm.uiState.value.binding)
+    }
+
 }

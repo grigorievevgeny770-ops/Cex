@@ -16,51 +16,53 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
+import com.logunovinc.workshopmanager.core.ui.RefreshableContent
 import com.logunovinc.workshopmanager.domain.task.*
 
 @Composable
-fun DispatchExecutionRoute(viewModel: DispatchExecutionViewModel, onDetailClick: () -> Unit, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
+fun DispatchExecutionRoute(viewModel: DispatchExecutionViewModel, onCompleted: (com.logunovinc.workshopmanager.domain.pending.CommandConfirmation) -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CompletedTaskEffect((state.result as? ExecutionResultState.Confirmed)?.receipt, onCompleted)
-    DispatchExecutionScreen(state, viewModel::onIntent, onDetailClick)
+    DispatchExecutionScreen(state, viewModel::onIntent)
 }
 @Composable
-fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (DispatchExecutionIntent) -> Unit, onDetailClick: () -> Unit) {
+fun DispatchExecutionScreen(state: DispatchExecutionUiState, onIntent: (DispatchExecutionIntent) -> Unit) {
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val task = state.task
-    LazyColumn(Modifier.fillMaxSize().testTag("dispatch-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("Отправка", style = MaterialTheme.typography.headlineMedium)
-            Text("Укажите, сколько отправляете сейчас")
-            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
-            when (val result = state.result) {
-                is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary); Text("Товар в пути"); TextButton(onClick = onDetailClick) { Text("К заданию") } }
-                is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error); if (state.pending == null) TextButton(onClick = onDetailClick) { Text("К заданию") } }
-                is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
-                ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                else -> Unit
+    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(DispatchExecutionIntent.Refresh) }) {
+        LazyColumn(Modifier.fillMaxSize().testTag("dispatch-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                Text("Отправка", style = MaterialTheme.typography.headlineMedium)
+                Text("Укажите, сколько отправляете сейчас")
+                if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                when (val result = state.result) {
+                    is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary); Text("Товар в пути") }
+                    is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error) }
+                    is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
+                    ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    else -> Unit
+                }
+                state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) } }
+                if (task != null && !task.canExecute) Text("Отправка недоступна")
             }
-            state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) }; TextButton(onClick = onDetailClick) { Text("К заданию") } }
-            if (task != null && !task.canExecute) Text("Отправка недоступна")
-        }
-        items(task?.lines.orEmpty(), key = TaskLine::id) { line ->
-            val input = state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id)
-            val sheets = line.plannedSheets != null || line.remainingSheets != null
-            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(line.productName, style = MaterialTheme.typography.titleMedium)
-                Text("Уже отправлено ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
-                if (sheets) {
-                    Text("Листы: отправлено ${line.actualSheets ?: "—"} · осталось ${line.remainingSheets ?: "—"}")
-                    line.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
-                    OutlinedTextField(value = input.sheets, onValueChange = { onIntent(DispatchExecutionIntent.SheetsChanged(line.id, it)) }, label = { Text("Отдано листов в этом шаге") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(DispatchExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Отправить сейчас, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-            } }
-        }
-        item {
-            Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(DispatchExecutionIntent.ReviewClick) }, enabled = state.editable, modifier = Modifier.fillMaxWidth()) { Text("Отправить") }
-            TextButton(onClick = { onIntent(DispatchExecutionIntent.Refresh) }, enabled = state.result != ExecutionResultState.Sending) { Text("Обновить") }
+            items(task?.lines.orEmpty(), key = TaskLine::id) { line ->
+                val input = state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id)
+                val sheets = line.plannedSheets != null || line.remainingSheets != null
+                Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(line.productName, style = MaterialTheme.typography.titleMedium)
+                    Text("Уже отправлено ${QuantityFormatter.format(line.actual)} · осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
+                    if (sheets) {
+                        Text("Листы: отправлено ${line.actualSheets ?: "—"} · осталось ${line.remainingSheets ?: "—"}")
+                        line.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
+                        OutlinedTextField(value = input.sheets, onValueChange = { onIntent(DispatchExecutionIntent.SheetsChanged(line.id, it)) }, label = { Text("Отдано листов в этом шаге") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                    } else OutlinedTextField(value = input.quantity, onValueChange = { onIntent(DispatchExecutionIntent.QuantityChanged(line.id, it)) }, label = { Text("Отправить сейчас, ${line.baseUnit.orEmpty()}") }, enabled = state.editable, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
+                } }
+            }
+            item {
+                Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(DispatchExecutionIntent.ReviewClick) }, enabled = state.editable, modifier = Modifier.fillMaxWidth()) { Text("Отправить") }
+            }
         }
     }
     state.review?.let { review ->

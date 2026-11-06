@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 data class CloseIncompleteDialog(val task: Task, val reason: String = "")
 
 data class TaskDetailUiState(
-    val loading: Boolean = true, val task: Task? = null, val error: AppError? = null,
+    val loading: Boolean = true, val refreshing: Boolean = false, val task: Task? = null, val error: AppError? = null,
     val lastConfirmation: CommandConfirmation? = null, val staleTask: Boolean = false,
     val pending: PendingCommand? = null, val retrying: Boolean = false, val retryError: AppError? = null,
     val closeDialog: CloseIncompleteDialog? = null, val closeChecking: Boolean = false,
@@ -26,6 +26,7 @@ data class TaskDetailUiState(
     val history: List<HistoryEntry> = emptyList(), val historyLoading: Boolean = false,
     val historyOffset: Long = 0, val historyMore: Boolean = false, val historyError: AppError? = null,
 ) {
+    val canRefresh: Boolean get() = !loading && !closeSending && !retrying && !closeChecking && closeDialog == null
     val executionAvailable: Boolean get() = !loading && !staleTask && !retrying && pending == null && !closeSending && !closeChecking && closeDialog == null && task?.canExecute == true
     val closeAvailable: Boolean get() = !loading && !staleTask && !retrying && pending == null && !closeSending && !closeChecking && closeDialog == null && task?.canCloseIncomplete == true
 }
@@ -74,7 +75,7 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             is TaskDetailIntent.CloseReasonChanged -> if (!uiState.value.closeSending) mutableState.update { it.copy(closeDialog = it.closeDialog?.copy(reason = intent.value), closeError = null) }
             TaskDetailIntent.DismissClose -> if (!uiState.value.closeSending) mutableState.update { it.copy(closeDialog = null, closeError = null) }
             TaskDetailIntent.ConfirmClose -> confirmClose()
-            TaskDetailIntent.Refresh -> refresh()
+            TaskDetailIntent.Refresh -> if (uiState.value.canRefresh) refresh(manual = true)
             TaskDetailIntent.LoadMoreExecutions -> executions(reset = false)
             TaskDetailIntent.ToggleDebugHistory -> toggleDebugHistory()
             TaskDetailIntent.LoadMoreHistory -> history(reset = false)
@@ -142,18 +143,18 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             }
         }
     }
-    private fun refresh() {
+    private fun refresh(manual: Boolean = false) {
         if (uiState.value.closeSending) return
         val request = ++generation
         historyGeneration++
         historyJob?.cancel()
-        mutableState.update { it.copy(loading = true, error = null, staleTask = true, closeChecking = false, closeDialog = null,
+        mutableState.update { it.copy(loading = true, refreshing = manual, error = null, staleTask = true, closeChecking = false, closeDialog = null,
             history = emptyList(), historyLoading = false, historyOffset = 0, historyMore = false, historyError = null) }
         viewModelScope.launch {
             when (val result = loadTask(taskId)) {
-                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, error = result.error) }
+                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, error = result.error) }
                 is Outcome.Success -> if (request == generation) {
-                    mutableState.update { it.copy(loading = false, task = result.value, staleTask = false) }
+                    mutableState.update { it.copy(loading = false, refreshing = false, task = result.value, staleTask = false) }
                     executions(reset = true)
                     history(reset = true)
                 }

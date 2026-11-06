@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -15,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.awaitCancellation
 import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
+import com.logunovinc.workshopmanager.core.ui.RefreshableContent
 import com.logunovinc.workshopmanager.domain.stock.*
 
 @Composable
@@ -67,26 +69,27 @@ fun StockDetailRoute(viewModel: StockDetailViewModel) {
 @Composable
 fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -> Unit) {
     val position = state.position
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
-        item {
-            Text(position?.productName ?: "Позиция склада", style = MaterialTheme.typography.headlineMedium)
-                if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
-            TextButton(onClick = { onIntent(StockDetailIntent.Refresh) }) { Text("Обновить") }
-        }
-        if (position != null) {
+    RefreshableContent(state.refreshing, !state.loading, { onIntent(StockDetailIntent.Refresh) }) {
+        LazyColumn(Modifier.fillMaxSize().testTag("stock-detail-list").padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
             item {
-                StockTotals(position)
-                if (position.unallocatedStock.signum() != 0 && position.dimensions.isNotEmpty()) Text("Без размера: ${QuantityFormatter.format(position.unallocatedStock)} ${position.baseUnit}")
-                if (position.dimensions.isNotEmpty()) Text("Размеры", style = MaterialTheme.typography.titleLarge)
+                Text(position?.productName ?: "Позиция склада", style = MaterialTheme.typography.headlineMedium)
+                    if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
             }
-            items(position.dimensions) { dimension ->
-                Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Длина ${QuantityFormatter.format(dimension.length)} м", style = MaterialTheme.typography.titleMedium)
-                    Text("Физически ${QuantityFormatter.format(dimension.quantity)} ${position.baseUnit} · ${dimension.sheets} листов")
-                    Text("Свободно ${dimension.free?.let(QuantityFormatter::format) ?: "неизвестно"} ${position.baseUnit}")
-                    Text("Свободных листов: ${dimension.freeSheets?.toString() ?: "неизвестно"}")
-                } }
+            if (position != null) {
+                item {
+                    StockTotals(position)
+                    if (position.unallocatedStock.signum() != 0 && position.dimensions.isNotEmpty()) Text("Без размера: ${QuantityFormatter.format(position.unallocatedStock)} ${position.baseUnit}")
+                    if (position.dimensions.isNotEmpty()) Text("Размеры", style = MaterialTheme.typography.titleLarge)
+                }
+                items(position.dimensions) { dimension ->
+                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Длина ${QuantityFormatter.format(dimension.length)} м", style = MaterialTheme.typography.titleMedium)
+                        Text("Физически ${QuantityFormatter.format(dimension.quantity)} ${position.baseUnit} · ${dimension.sheets} листов")
+                        Text("Свободно ${dimension.free?.let(QuantityFormatter::format) ?: "неизвестно"} ${position.baseUnit}")
+                        Text("Свободных листов: ${dimension.freeSheets?.toString() ?: "неизвестно"}")
+                    } }
+                }
             }
         }
     }

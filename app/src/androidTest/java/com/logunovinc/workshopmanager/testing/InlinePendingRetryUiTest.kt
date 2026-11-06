@@ -43,7 +43,7 @@ class InlinePendingRetryUiTest {
         click("receive-list","receive-review");waitTag("receive-confirm");compose.onNodeWithTag("receive-confirm").performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Исход неизвестен",substring=true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("receive-list").performScrollToIndex(0)
-        compose.onAllNodesWithText("К заданию").onFirst().performClick();waitTag("task-retry-pending")
+        compose.onNodeWithText("Назад",substring=false).performClick();waitTag("task-retry-pending")
         compose.onAllNodesWithText("Проверка действий").assertCountEquals(0)
         compose.onNodeWithText("Материал: 4 шт",substring=true).assertIsDisplayed()
         compose.onNodeWithTag("task-retry-pending").performTouchInput { doubleClick() }

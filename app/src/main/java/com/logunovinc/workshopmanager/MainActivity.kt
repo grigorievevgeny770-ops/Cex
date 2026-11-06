@@ -61,22 +61,13 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
                 TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }, { navController.navigate("manufacturing/$it") }, { navController.navigate("receive/$it?final=true") }, onCompleted = completed)
             }
             composable("receive/{taskId}?final={final}", arguments = listOf(navArgument("taskId") { type = NavType.LongType }, navArgument("final") { type = NavType.BoolType; defaultValue = false })) { entry ->
-                val taskId = entry.arguments?.getLong("taskId") ?: return@composable
-                ReceiveExecutionRoute(hiltViewModel(entry), {
-                    navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
-                }, onCompleted = completed)
+                ReceiveExecutionRoute(hiltViewModel(entry), onCompleted = completed)
             }
             composable("dispatch/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                val taskId = entry.arguments?.getLong("taskId") ?: return@composable
-                DispatchExecutionRoute(hiltViewModel(entry), {
-                    navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
-                }, onCompleted = completed)
+                DispatchExecutionRoute(hiltViewModel(entry), onCompleted = completed)
             }
             composable("manufacturing/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                val taskId = entry.arguments?.getLong("taskId") ?: return@composable
-                ManufacturingRoute(hiltViewModel(entry), {
-                    navController.navigate("task/$taskId") { popUpTo("task/$taskId") { inclusive = true }; launchSingleTop = true }
-                }, onCompleted = completed)
+                ManufacturingRoute(hiltViewModel(entry), onCompleted = completed)
             }
             // Migration only: Navigation 2.9 restores saved destination IDs before composing.
             // Old saved stacks may still contain this removed screen; no recovery UI remains.

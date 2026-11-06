@@ -54,6 +54,8 @@ class ReceiveExecutionViewModelTest {
         vm.onIntent(ReceiveExecutionIntent.QuantityChanged(1001, "9"))
         assertEquals("4,0000", vm.uiState.value.inputs.single().quantity)
         assertEquals(0, tasks.count)
+        vm.onIntent(ReceiveExecutionIntent.Refresh);runCurrent()
+        assertNotNull(vm.uiState.value.review);assertEquals(1,tasks.reads)
         vm.onIntent(ReceiveExecutionIntent.ConfirmClick)
         vm.onIntent(ReceiveExecutionIntent.ConfirmClick)
         vm.onIntent(ReceiveExecutionIntent.Refresh)
@@ -123,6 +125,15 @@ class ReceiveExecutionViewModelTest {
         assertEquals(1,tasks.count);assertTrue(tasks.command!!.final);assertTrue(tasks.command!!.lines.isEmpty())
         assertEquals("4",recreated.uiState.value.task!!.lines.single().actual.toPlainString());assertEquals("6",recreated.uiState.value.task!!.lines.single().remaining.toPlainString())
         assertEquals("shortage",recreated.uiState.value.task!!.outcome);assertFalse(recreated.uiState.value.final)
+    }
+
+    @Test fun pullRefreshPreservesFinalQuantityAndReasonDraftAndReadsOnlyOnce() = runTest(dispatcher) {
+        val tasks=Tasks();val vm=vm(tasks,Pending(),finalMode=true);runCurrent()
+        vm.onIntent(ReceiveExecutionIntent.QuantityChanged(1001,"4,0000"));vm.onIntent(ReceiveExecutionIntent.ReasonChanged("Остальная часть не прибыла"))
+        vm.onIntent(ReceiveExecutionIntent.Refresh);vm.onIntent(ReceiveExecutionIntent.Refresh)
+        assertTrue(vm.uiState.value.refreshing);runCurrent()
+        assertEquals(2,tasks.reads);assertEquals(0,tasks.count);assertFalse(vm.uiState.value.refreshing)
+        assertEquals("4,0000",vm.uiState.value.inputs.single().quantity);assertTrue(vm.uiState.value.final);assertEquals("Остальная часть не прибыла",vm.uiState.value.reason)
     }
 
 }

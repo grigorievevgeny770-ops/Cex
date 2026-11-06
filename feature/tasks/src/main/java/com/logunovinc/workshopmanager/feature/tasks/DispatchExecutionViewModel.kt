@@ -12,11 +12,12 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class DispatchExecutionUiState(
-    val loading: Boolean = true, val stale: Boolean = true, val task: Task? = null,
+    val loading: Boolean = true, val refreshing: Boolean = false, val stale: Boolean = true, val task: Task? = null,
     val inputs: List<ActualLineInput> = emptyList(),
     val review: DispatchCommand? = null, val result: ExecutionResultState = ExecutionResultState.Idle,
     val pending: PendingCommand? = null, val error: AppError? = null,
 ) {
+    val canRefresh: Boolean get() = !loading && result != ExecutionResultState.Sending && review == null
     val editable: Boolean get() = !loading && !stale && task?.type == TaskType.DISPATCH_GOODS && task.canExecute &&
         result != ExecutionResultState.Sending && result !is ExecutionResultState.Unresolved && pending == null && review == null
 }
@@ -61,7 +62,7 @@ class DispatchExecutionViewModel @Inject constructor(savedStateHandle: SavedStat
             }
             DispatchExecutionIntent.DismissReview -> if (current.result != ExecutionResultState.Sending) mutableState.update { it.copy(review = null) }
             DispatchExecutionIntent.ConfirmClick -> confirm()
-            DispatchExecutionIntent.Refresh -> if (current.result != ExecutionResultState.Sending) refresh(resetInputs = false)
+            DispatchExecutionIntent.Refresh -> if (current.canRefresh) refresh(resetInputs = false, manual = true)
         }
     }
     private fun confirm() {
@@ -80,14 +81,14 @@ class DispatchExecutionViewModel @Inject constructor(savedStateHandle: SavedStat
             }
         }
     }
-    private fun refresh(resetInputs: Boolean) {
+    private fun refresh(resetInputs: Boolean, manual: Boolean = false) {
         val request = ++generation
-        mutableState.update { it.copy(loading = true, stale = true, review = null, error = null) }
+        mutableState.update { it.copy(loading = true, refreshing = manual, stale = true, review = null, error = null) }
         viewModelScope.launch {
             when (val task = loadTask(taskId)) {
-                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, error = task.error) }
+                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, error = task.error) }
                 is Outcome.Success -> if (request == generation) mutableState.update { state ->
-                    state.copy(loading = false, stale = false, task = task.value,
+                    state.copy(loading = false, refreshing = false, stale = false, task = task.value,
                         inputs = task.value.lines.map { line -> if (resetInputs) ActualLineInput(line.id) else state.inputs.firstOrNull { it.taskLineId == line.id } ?: ActualLineInput(line.id) })
                 }
             }

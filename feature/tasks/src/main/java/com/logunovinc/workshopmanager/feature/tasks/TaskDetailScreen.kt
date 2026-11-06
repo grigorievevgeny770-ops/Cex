@@ -39,79 +39,80 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
     val keyboard=LocalSoftwareKeyboardController.current
     val task = state.task
     var showExecutions by remember(task?.id) { mutableStateOf(false) }
-    LazyColumn(Modifier.fillMaxSize().testTag("task-detail-list").padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(task?.type?.title() ?: "Задание", style = MaterialTheme.typography.headlineSmall)
-                TextButton(onClick = { onIntent(TaskDetailIntent.Refresh) }, enabled = !state.closeSending) { Text("Обновить") }
-            }
-            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.retryError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
-            state.closeError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
-            if (state.closeChecking) Text("Проверяем…")
-            state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
-            state.lastConfirmation?.let { Text("Готово", color = MaterialTheme.colorScheme.primary) }
-            state.pending?.let { pending ->
-                Text(pending.summary.operationalTitle(), style = MaterialTheme.typography.titleMedium)
-                pending.summary.operationalLines().forEach { Text(it) }
-                if (pending.summary.comment.isNotBlank()) Text(pending.summary.comment)
-                Text(when (pending.state) {
-                    com.logunovinc.workshopmanager.domain.pending.PendingState.PREPARED -> "Сохранено перед отправкой"
-                    com.logunovinc.workshopmanager.domain.pending.PendingState.NEEDS_REVIEW -> "Требуется сверка. Не выполняйте заново"
-                    else -> "Исход неизвестен. Возможно, действие уже выполнено"
-                })
-                if (state.retryError == null) pending.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
-                Button(onClick = { onIntent(TaskDetailIntent.RetryPendingClick) }, enabled = !state.retrying && !state.closeSending,
-                    modifier = Modifier.testTag("task-retry-pending")) { Text(if (state.retrying) "Отправляем…" else "Повторить действие") }
-            }
-            if (state.staleTask) Text("Обновите задание перед выполнением")
-        }
-        if (task != null) {
+    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(TaskDetailIntent.Refresh) }) {
+        LazyColumn(Modifier.fillMaxSize().testTag("task-detail-list").padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
             item {
-                if (task.comment.isNotBlank()) Text(task.comment)
-                if (task.isClosedIncomplete) {
-                    Text("Закрыта без полного выполнения", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
-                    task.closedIncompleteReason?.let { Text("Причина: $it") }
-                    Text("Выполненное сохранено. Оставшаяся работа закрыта")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(task?.type?.title() ?: "Задание", style = MaterialTheme.typography.headlineSmall)
                 }
-                if (task.isCompleted == true && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
-                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported != true) Text("Нужна настройка производства. Обратитесь к руководителю")
-                if (task.type == TaskType.UNKNOWN || task.isCompleted == null || task.isCancelled == null) Text("Выполнение недоступно")
-                if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, modifier = Modifier.testTag("task-manufacturing"), enabled = state.executionAvailable) { Text("Изготовить изделие") }
-                if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.executionAvailable) { Text("Отправить товары") }
-                if (task.canCloseIncomplete) OutlinedButton(onClick = { onIntent(TaskDetailIntent.CloseIncompleteClick) }, modifier = Modifier.testTag("task-close-incomplete"), enabled = state.closeAvailable) { Text("Завершить без полного выполнения") }
-                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, modifier = Modifier.testTag("task-receive"), enabled = state.executionAvailable) { Text("Принять товары") }
-                if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) OutlinedButton(onClick = { onFinishReceiveClick(task.id) }, modifier = Modifier.testTag("task-finish-receive"), enabled = state.executionAvailable) { Text("Завершить приёмку") }
+                if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                state.retryError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                state.closeError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                if (state.closeChecking) Text("Проверяем…")
+                state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                state.lastConfirmation?.let { Text("Готово", color = MaterialTheme.colorScheme.primary) }
+                state.pending?.let { pending ->
+                    Text(pending.summary.operationalTitle(), style = MaterialTheme.typography.titleMedium)
+                    pending.summary.operationalLines().forEach { Text(it) }
+                    if (pending.summary.comment.isNotBlank()) Text(pending.summary.comment)
+                    Text(when (pending.state) {
+                        com.logunovinc.workshopmanager.domain.pending.PendingState.PREPARED -> "Сохранено перед отправкой"
+                        com.logunovinc.workshopmanager.domain.pending.PendingState.NEEDS_REVIEW -> "Требуется сверка. Не выполняйте заново"
+                        else -> "Исход неизвестен. Возможно, действие уже выполнено"
+                    })
+                    if (state.retryError == null) pending.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
+                    Button(onClick = { onIntent(TaskDetailIntent.RetryPendingClick) }, enabled = !state.retrying && !state.closeSending,
+                        modifier = Modifier.testTag("task-retry-pending")) { Text(if (state.retrying) "Отправляем…" else "Повторить действие") }
+                }
+                if (state.staleTask) Text("Обновите задание перед выполнением")
             }
-            items(task.lines.filter { task.type != TaskType.MANUFACTURE_PRODUCT || it.role == "output" }, key = { "line-${it.id}" }) { line -> TaskLineCard(line) }
-            if (state.executions.isNotEmpty() || state.executionsLoading || state.executionsError != null) item {
-                TextButton(onClick = { showExecutions = !showExecutions }, modifier = Modifier.testTag("task-history-toggle")) { Text(if (showExecutions) "Скрыть историю" else "История") }
-            }
-            if (showExecutions) {
-                item { state.executionsError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }; if (state.executionsLoading) LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                items(state.executions, key = { "execution-${it.id}" }) { execution ->
-                    Card(Modifier.fillMaxWidth().testTag("execution-${execution.id}")) { Column(Modifier.padding(12.dp)) {
-                        Text(localDate(execution.at))
-                        if (execution.final) Text("Окончательная приёмка")
-                        execution.lines.forEach { actual ->
-                            val frozen = task.lines.firstOrNull { it.id == actual.taskLineId && it.productId == actual.productId }
-                            val productName = frozen?.productName ?: when (actual.role) {
-                                "input" -> "Материал"
-                                "output" -> "Изделие"
-                                else -> "Товар"
+            if (task != null) {
+                item {
+                    if (task.comment.isNotBlank()) Text(task.comment)
+                    if (task.isClosedIncomplete) {
+                        Text("Закрыта без полного выполнения", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                        task.closedIncompleteReason?.let { Text("Причина: $it") }
+                        Text("Выполненное сохранено. Оставшаяся работа закрыта")
+                    }
+                    if (task.isCompleted == true && task.outcome == "shortage") Text("Приёмка завершена с недостачей; менеджер разбирает расхождение")
+                    if (task.type == TaskType.MANUFACTURE_PRODUCT && task.production?.supported != true) Text("Нужна настройка производства. Обратитесь к руководителю")
+                    if (task.type == TaskType.UNKNOWN || task.isCompleted == null || task.isCancelled == null) Text("Выполнение недоступно")
+                    if (task.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute) Button(onClick = { onManufacturingClick(task.id) }, modifier = Modifier.testTag("task-manufacturing"), enabled = state.executionAvailable) { Text("Изготовить изделие") }
+                    if (task.type == TaskType.DISPATCH_GOODS && task.canExecute) Button(onClick = { onDispatchClick(task.id) }, enabled = state.executionAvailable) { Text("Отправить товары") }
+                    if (task.canCloseIncomplete) OutlinedButton(onClick = { onIntent(TaskDetailIntent.CloseIncompleteClick) }, modifier = Modifier.testTag("task-close-incomplete"), enabled = state.closeAvailable) { Text("Завершить без полного выполнения") }
+                    if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) Button(onClick = { onReceiveClick(task.id) }, modifier = Modifier.testTag("task-receive"), enabled = state.executionAvailable) { Text("Принять товары") }
+                    if (task.type == TaskType.RECEIVE_GOODS && task.canExecute) OutlinedButton(onClick = { onFinishReceiveClick(task.id) }, modifier = Modifier.testTag("task-finish-receive"), enabled = state.executionAvailable) { Text("Завершить приёмку") }
+                }
+                items(task.lines.filter { task.type != TaskType.MANUFACTURE_PRODUCT || it.role == "output" }, key = { "line-${it.id}" }) { line -> TaskLineCard(line) }
+                if (state.executions.isNotEmpty() || state.executionsLoading || state.executionsError != null) item {
+                    TextButton(onClick = { showExecutions = !showExecutions }, modifier = Modifier.testTag("task-history-toggle")) { Text(if (showExecutions) "Скрыть историю" else "История") }
+                }
+                if (showExecutions) {
+                    item { state.executionsError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }; if (state.executionsLoading) LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                    items(state.executions, key = { "execution-${it.id}" }) { execution ->
+                        Card(Modifier.fillMaxWidth().testTag("execution-${execution.id}")) { Column(Modifier.padding(12.dp)) {
+                            Text(localDate(execution.at))
+                            if (execution.final) Text("Окончательная приёмка")
+                            execution.lines.forEach { actual ->
+                                val frozen = task.lines.firstOrNull { it.id == actual.taskLineId && it.productId == actual.productId }
+                                val productName = frozen?.productName ?: when (actual.role) {
+                                    "input" -> "Материал"
+                                    "output" -> "Изделие"
+                                    else -> "Товар"
+                                }
+                                Text("$productName: ${QuantityFormatter.format(actual.actual)} ${frozen?.baseUnit.orEmpty()}${actual.sheets?.let { count -> " · $count листов" }.orEmpty()}")
+                                frozen?.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
                             }
-                            Text("$productName: ${QuantityFormatter.format(actual.actual)} ${frozen?.baseUnit.orEmpty()}${actual.sheets?.let { count -> " · $count листов" }.orEmpty()}")
-                            frozen?.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
-                        }
-                        if (execution.comment.isNotBlank()) Text(execution.comment)
-                    } }
+                            if (execution.comment.isNotBlank()) Text(execution.comment)
+                        } }
+                    }
+                    if (state.executionsMore) item { OutlinedButton(onClick = { onIntent(TaskDetailIntent.LoadMoreExecutions) }, enabled = !state.executionsLoading) { Text("Ещё факты") } }
                 }
-                if (state.executionsMore) item { OutlinedButton(onClick = { onIntent(TaskDetailIntent.LoadMoreExecutions) }, enabled = !state.executionsLoading) { Text("Ещё факты") } }
+
             }
-
         }
-    }
 
+    }
     state.closeDialog?.let { dialog ->
         AlertDialog(onDismissRequest = { if (!state.closeSending) onIntent(TaskDetailIntent.DismissClose) },
             title = { Text("Завершить без полного выполнения?") },

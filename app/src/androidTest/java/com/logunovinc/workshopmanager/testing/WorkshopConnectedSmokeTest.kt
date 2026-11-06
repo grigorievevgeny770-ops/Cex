@@ -70,8 +70,8 @@ class WorkshopConnectedSmokeTest {
         assertEquals(1, backend.backend.executions.get())
         assertEquals(0, backend.backend.starts.get())
         compose.onNodeWithTag("receive-list").performScrollToIndex(0)
-        waitText("К заданию")
-        compose.onNodeWithText("К заданию").performClick()
+        waitText("Назад")
+        compose.onNodeWithText("Назад",substring=false).performClick()
         clickInList("task-detail-list","task-history-toggle")
         compose.onNodeWithTag("task-detail-list").performScrollToNode(hasTestTag("execution-5001"))
         waitText("Материал: 4 шт")
@@ -131,7 +131,7 @@ class WorkshopConnectedSmokeTest {
         compose.onNodeWithTag("receive-list").performScrollToNode(hasTestTag("receive-qty-1001"));compose.onNodeWithTag("receive-qty-1001").performTextInput("4")
         clickInList("receive-list","receive-review");waitText("Принять эту часть?");compose.onNodeWithTag("receive-confirm").performClick()
         compose.waitUntil(15_000) { backend.backend.executions.get()==1 }
-        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("К заданию");compose.onNodeWithText("К заданию").performClick()
+        compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Назад");compose.onNodeWithText("Назад",substring=false).performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-finish-receive").fetchSemanticsNodes().isNotEmpty() }
         clickInList("task-detail-list","task-finish-receive")
         waitText("Можно принять 0",true);assertEquals(1,backend.backend.executions.get())
