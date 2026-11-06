@@ -126,9 +126,9 @@ private fun TaskLineCard(line: TaskLine) {
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(line.productName, style = MaterialTheme.typography.titleMedium)
         Text("План: ${QuantityFormatter.format(line.planned)} ${line.baseUnit.orEmpty()}")
-        Text("Факт: ${QuantityFormatter.format(line.actual)} · Осталось: ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
-        line.plannedUnit?.let { Text("В ${line.unitName.orEmpty()}: план ${QuantityFormatter.format(it)}, факт ${line.actualUnit?.let(QuantityFormatter::format) ?: "—"}, осталось ${line.remainingUnit?.let(QuantityFormatter::format) ?: "—"}") }
-        line.plannedSheets?.let { Text("Листы: план $it, факт ${line.actualSheets ?: "—"}, осталось ${line.remainingSheets ?: "—"}") }
+        Text("Факт: ${QuantityFormatter.format(line.actual)} · Осталось сделать: ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}")
+        line.plannedUnit?.let { Text("В ${line.unitName.orEmpty()}: план ${QuantityFormatter.format(it)}, факт ${line.actualUnit?.let(QuantityFormatter::format) ?: "—"}, осталось сделать ${line.remainingUnit?.let(QuantityFormatter::format) ?: "—"}") }
+        line.plannedSheets?.let { Text("Листы: план $it, факт ${line.actualSheets ?: "—"}, осталось сделать ${line.remainingSheets ?: "—"}") }
         line.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
     } }
 

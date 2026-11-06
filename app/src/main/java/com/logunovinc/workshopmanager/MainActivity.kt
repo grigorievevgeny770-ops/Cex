@@ -43,7 +43,7 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
         tasks.savedStateHandle["completedCommandId"] = receipt.commandId
         navController.popBackStack("tasks", false)
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("Цех") }, navigationIcon = {
+    Scaffold(topBar = { TopAppBar(title = {}, navigationIcon = {
         if (route != "tasks" && route != "stock") TextButton(onClick = { navController.popBackStack() }) { Text("Назад") }
     }, actions = { TextButton(onClick = onLogout) { Text("Выйти") } }) }, bottomBar = {
         if (route != "login") NavigationBar {
