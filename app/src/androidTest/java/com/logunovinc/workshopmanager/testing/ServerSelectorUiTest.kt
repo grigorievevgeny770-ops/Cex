@@ -36,7 +36,7 @@ class ServerSelectorUiTest {
     @Test fun presetsAndCustomApplyKeepActualServerVisibleAndRemoteCredentialsEmpty() {
         assertEquals("https://147-45-154-211.sslip.io/",BuildConfig.DEFAULT_BASE_URL)
         val settings=Settings()
-        val vm=AuthViewModel(settings,LoginUseCase(settings),RestoreSessionUseCase(settings),LogoutUseCase(settings),ChangeEnvironmentUseCase(settings),AuthPrefill("fixture-local-user","fixture-local-password"))
+        val vm=AuthViewModel(settings,LoginUseCase(settings),RestoreSessionUseCase(settings),LogoutUseCase(settings),ChangeEnvironmentUseCase(settings),AuthPrefill())
         compose.setContent { val state by vm.uiState.collectAsState();AuthScreen(state,vm::onIntent) }
         compose.waitUntil(10_000) { !vm.uiState.value.busy && !vm.uiState.value.restoring }
         compose.onNodeWithText("Удалённый сервер").assertIsDisplayed();emptyCredentials()

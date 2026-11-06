@@ -42,12 +42,12 @@ class AuthViewModelTest {
             assertEquals(0, repository.calls)
         }
     }
-    @Test fun offlineLocalStartupStillPrefillsButRemoteAndOtherPortsStayEmpty() = runTest(dispatcher) {
-        for (baseUrl in listOf("http://10.0.2.2:8000/", "https://remote.example/", "https://remote.example:8000/", "http://localhost:9000/")) {
+    @Test fun offlineAuthorizedStartupPrefillsButOtherOriginsAndPathsStayEmpty() = runTest(dispatcher) {
+        for (baseUrl in listOf("http://10.0.2.2:8000/", "https://147-45-154-211.sslip.io/", "https://remote.example/", "https://remote.example:8000/", "http://localhost:9000/", "http://147-45-154-211.sslip.io/", "https://147-45-154-211.sslip.io:8000/", "https://147-45-154-211.sslip.io/other/", "https://147-45-154-211.sslip.io/?q=1", "https://147-45-154-211.sslip.io/#fragment", "https://user@147-45-154-211.sslip.io/", "http://localhost:8000/other/")) {
             val repository = Repository(baseUrl).apply { restoreError = AppError(ErrorKind.NETWORK, "Offline") }
             val vm = viewModel(repository, AuthPrefill("fixture-local-user", "fixture-local-password"))
             runCurrent()
-            assertEquals(if (baseUrl == "http://10.0.2.2:8000/") "fixture-local-password" else "", vm.uiState.value.password)
+            assertEquals(if (baseUrl in setOf("http://10.0.2.2:8000/", "https://147-45-154-211.sslip.io/")) "fixture-local-password" else "", vm.uiState.value.password)
             assertEquals(0, repository.calls)
         }
     }
@@ -105,7 +105,7 @@ class AuthViewModelTest {
         assertEquals(0,repository.calls);assertEquals(1,repository.environmentWrites)
         val recreated=viewModel(repository,prefill);runCurrent()
         assertEquals(ServerOption.REMOTE,recreated.uiState.value.serverOption)
-        assertEquals("",recreated.uiState.value.password);assertEquals(0,repository.calls)
+        assertEquals("fixture-local-password",recreated.uiState.value.password);assertEquals(0,repository.calls)
     }
     @Test fun customChoiceDoesNotSwitchUntilAppliedAndDraftCannotLoginIntoPreviousServer() = runTest(dispatcher) {
         val repository=Repository(ServerOption.REMOTE.baseUrl!!)
@@ -125,10 +125,10 @@ class AuthViewModelTest {
         assertEquals(repository.environment.value,recreated.uiState.value.environmentInput)
         assertEquals("",recreated.uiState.value.password)
     }
-    @Test fun presetSelectionOverridesUnappliedDraftAndRemoteDefaultNeverPrefills() = runTest(dispatcher) {
+    @Test fun presetSelectionOverridesUnappliedDraftAndRemoteDefaultPrefillsWithoutLogin() = runTest(dispatcher) {
         val repository=Repository(ServerOption.REMOTE.baseUrl!!)
         val vm=viewModel(repository,AuthPrefill("fixture-local-user","fixture-local-password"));runCurrent()
-        assertEquals(ServerOption.REMOTE,vm.uiState.value.serverOption);assertEquals("",vm.uiState.value.login);assertEquals("",vm.uiState.value.password)
+        assertEquals(ServerOption.REMOTE,vm.uiState.value.serverOption);assertEquals("fixture-local-user",vm.uiState.value.login);assertEquals("fixture-local-password",vm.uiState.value.password)
         vm.onIntent(AuthIntent.ServerSelected(ServerOption.CUSTOM));vm.onIntent(AuthIntent.EnvironmentChanged("invalid"));vm.onIntent(AuthIntent.ApplyEnvironment);runCurrent()
         assertNotNull(vm.uiState.value.error);assertEquals(0,repository.environmentWrites)
         vm.onIntent(AuthIntent.ServerSelected(ServerOption.REMOTE));runCurrent()

@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 767 389 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 524 473 байт.
 
-SHA256: `dfada4e28e358334987e99075d2542292783a2cbe9f5c8b50f4255a8a370cf98`.
+SHA256: `a1c0e6cb90c782408d6a705962069761cc73216b91eced4828e8e2418e602acd`.
 
 APK установлен и запущен на emulator-5554/API37. Debug/release default: `https://147-45-154-211.sslip.io/` (saved environment takes precedence). SDK/JDK и настройка окружений — в README.md.
 
@@ -138,3 +138,5 @@ Actual backend baseline /tmp/tseh-terminal-ack-real-baseline/result.json PASS (t
 ## 2026-11-06 — pull-to-refresh и один возврат
 Кнопки «Обновить» заменены жестом на пяти detail/execution экранах; существующие жесты списков сохранены. Общий Material3 контейнер действительно отключает gesture при write/retry/close/review; manual-refresh indicator не пересоздаёт список. Ввод количества/причины/материалов сохраняется, read не создаёт POST. Кнопки «К заданию» удалены, возврат — тулбаром/системным «Назад».
 До нового пользовательского ограничения прошли138unit/lint/assemble (/tmp/tseh-pull-refresh-final-verify3.log), independent root verify (/tmp/tseh-pull-refresh-root-verify.log),17manualUI (/tmp/tseh-pull-refresh-manual-ui.log). Из17 три старые локальные проверки кликов не входят в коммит; в репозитории14device cases. Два новых физических swipe cases проверили один GET, сохранение ввода, блокировку во время отправки и stock4→7 без POST. После указания «тесты только по просьбе» запусков нет; дальнейшая политика в AGENTS.md. VPN/network/auth code на этом этапе не менялся.
+
+2026-11-06 debug prefill: предоставленные пользователем значения хранятся в игнорируемом local.properties и обычном debug BuildConfig; root remote HTTPS разрешён для предзаполнения без автовхода. Release/processFixture пустые. assembleDebug SUCCESS /tmp/tseh-debug-prefill-build.log; текущий Gradle вывел APK в intermediates/apk/debug, итоговый файл скопирован в привычный outputs/apk/debug. Тесты не запускались; существующие test expectations обновлены без запуска.
