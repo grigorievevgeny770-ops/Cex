@@ -2,6 +2,7 @@ package com.logunovinc.workshopmanager.feature.stock
 
 import androidx.lifecycle.SavedStateHandle
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.order.*
 import com.logunovinc.workshopmanager.domain.stock.*
 import com.logunovinc.workshopmanager.domain.task.Page
 import com.logunovinc.workshopmanager.domain.warehouse.*
@@ -28,9 +29,7 @@ class StockViewModelsTest {
         override suspend fun stock(warehouseId: Long, filter: StockFilter, limit: Int, offset: Long): Outcome<Page<StockPosition>> { assertEquals(42L, warehouseId); calls++; lastFilter = filter; return listing(filter, offset) }
         override suspend fun position(warehouseId: Long, productId: Long): Outcome<StockPosition> { assertEquals(42L, warehouseId); assertEquals(301L, productId); calls++; return Outcome.Success(current) }
         override suspend fun products(query: String, limit: Int, offset: Long): Outcome<Page<Product>> = error("unused")
-        var flatSheet = true
-        var productResult: Outcome<Product>? = null
-        override suspend fun product(productId: Long): Outcome<Product> = productResult ?: Outcome.Success(Product(productId, if (flatSheet) "Лист" else "Конёк", "м²", flatSheet, null))
+        override suspend fun product(productId: Long): Outcome<Product> = error("unused")
         override suspend fun definition(productId: Long): Outcome<StockDefinition> = error("unused")
         companion object {
             fun position(id: Long = 301) = StockPosition(42, id, "Материал", null, "шт", BigDecimal.ZERO, BigDecimal("2"), BigDecimal("-2"), BigDecimal.ZERO, BigDecimal.ONE,
@@ -42,7 +41,7 @@ class StockViewModelsTest {
         val old = CompletableDeferred<Unit>()
         repository.listing = { filter, _ -> if (filter.query.isEmpty()) withContext(NonCancellable) { old.await(); Outcome.Success(Page(listOf(Stock.position(1)), 1, 50, 0)) }
             else Outcome.Success(Page(listOf(Stock.position(2)), 1, 50, 0)) }
-        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository), LoadProductUseCase(repository))
+        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository), WorkshopOrders(NoStockOrders))
         runCurrent()
         vm.onIntent(StockListIntent.QueryChanged("new"))
         advanceTimeBy(301); runCurrent()
@@ -54,7 +53,7 @@ class StockViewModelsTest {
     @Test fun pagingBeyondFiftyAlwaysIncludesUnavailableStock() = runTest(dispatcher) {
         val repository = Stock()
         repository.listing = { _, offset -> Outcome.Success(Page((offset until minOf(offset + 50, 55)).map { Stock.position(it + 1) }, 55, 50, offset)) }
-        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository), LoadProductUseCase(repository))
+        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository), WorkshopOrders(NoStockOrders))
         runCurrent()
         assertFalse(repository.lastFilter!!.onlyAvailable)
         vm.onIntent(StockListIntent.LoadMore); vm.onIntent(StockListIntent.LoadMore)
@@ -66,7 +65,7 @@ class StockViewModelsTest {
     }
     @Test fun revokedWorkshopClearsCachedRowsAndShowsPermissionError() = runTest(dispatcher) {
         val warehouse = Warehouses()
-        val vm = StockListViewModel(ResolveWorkshopUseCase(warehouse), LoadStockUseCase(Stock()), LoadProductUseCase(Stock()))
+        val vm = StockListViewModel(ResolveWorkshopUseCase(warehouse), LoadStockUseCase(Stock()), WorkshopOrders(NoStockOrders))
         runCurrent()
         assertEquals(1, vm.uiState.value.items.size)
         warehouse.result = Outcome.Failure(AppError(ErrorKind.FORBIDDEN, "Нет доступа"))
@@ -76,9 +75,8 @@ class StockViewModelsTest {
     }
     @Test fun detailKeepsUnknownDimensionsAndRefreshReadsNewServerTruth() = runTest(dispatcher) {
         val stock = Stock()
-        val vm = StockDetailViewModel(SavedStateHandle(mapOf("productId" to 301L)), ResolveWorkshopUseCase(Warehouses()), LoadStockPositionUseCase(stock), LoadProductUseCase(stock))
+        val vm = StockDetailViewModel(SavedStateHandle(mapOf("productId" to 301L)), ResolveWorkshopUseCase(Warehouses()), LoadStockPositionUseCase(stock))
         runCurrent()
-        assertEquals(true, vm.uiState.value.flatSheet)
         assertEquals(BigDecimal("-2"), vm.uiState.value.position!!.free)
         assertNull(vm.uiState.value.position!!.dimensions.single().freeSheets)
         stock.current = stock.current.copy(quantity = BigDecimal("5"), free = BigDecimal("3"))
@@ -86,24 +84,18 @@ class StockViewModelsTest {
         assertEquals(BigDecimal("5"), vm.uiState.value.position!!.quantity)
         assertEquals(2, stock.calls)
     }
-    @Test fun finishedGoodsAndUnverifiedRowsAreNotShownAsFlatSheet() = runTest(dispatcher) {
-        val hidden = Stock()
-        hidden.flatSheet = false
-        hidden.listing = { _, _ -> Outcome.Success(Page(listOf(Stock.position(2)), 1, 50, 0)) }
-        val hiddenList = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(hidden), LoadProductUseCase(hidden))
-        runCurrent()
-        assertTrue(hiddenList.uiState.value.items.isEmpty())
-        assertEquals(0, hiddenList.uiState.value.unverified)
-        val unknown = Stock()
-        unknown.productResult = Outcome.Failure(AppError(ErrorKind.NETWORK, "нет сети"))
-        val unknownList = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(unknown), LoadProductUseCase(unknown))
-        runCurrent()
-        assertTrue(unknownList.uiState.value.items.isEmpty())
-        assertEquals(1, unknownList.uiState.value.unverified)
-        val detailStock = Stock()
-        detailStock.flatSheet = false
-        val detail = StockDetailViewModel(SavedStateHandle(mapOf("productId" to 301L)), ResolveWorkshopUseCase(Warehouses()), LoadStockPositionUseCase(detailStock), LoadProductUseCase(detailStock))
-        runCurrent()
-        assertEquals(false, detail.uiState.value.flatSheet)
-    }
+}
+
+private object NoStockOrders : WorkshopOrderRepository {
+    override suspend fun contracts() = Outcome.Success(WorkshopContracts(false, false, false))
+    override suspend fun orders(warehouseId: Long, view: OrderView, limit: Int, offset: Long) = error("unused")
+    override suspend fun order(id: Long) = error("unused")
+    override suspend fun start(order: WorkshopOrder) = error("unused")
+    override suspend fun manufacture(order: WorkshopOrder, materials: List<SheetUse>) = error("unused")
+    override suspend fun handOver(order: WorkshopOrder) = error("unused")
+    override suspend fun reverse(order: WorkshopOrder, target: ReverseTarget) = error("unused")
+    override suspend fun stockSummary(warehouseId: Long, on: java.time.LocalDate) = error("unused")
+    override suspend fun sheetRequests(warehouseId: Long) = error("unused")
+    override suspend fun requestSheet(warehouseId: Long, productId: Long, length: java.math.BigDecimal, sheets: Int) = error("unused")
+    override suspend fun receiveSheet(request: SheetRequest) = error("unused")
 }

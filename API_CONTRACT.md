@@ -61,7 +61,15 @@ CommandConfirmation exposes a presentation-independent terminal flag derived onl
 
 2026-11-06: removal of global recovery UI changes only navigation/presentation. Manual retry by saved command ID now lives on task detail; Task.canExecute is not required for this read/replay of the already confirmed intent. Raw bytes/token/server/actor, acknowledgement persistence, terminal navigation and shared dispatcher mutex remain unchanged.
 
-## 2026-11-06 — заявки цеха, первый этап
+## 2026-11-06 — клиент заявок, если сервер объявил маршруты
+
+Android вызывает заявки, остатки и лист только когда публичный `openapi.json` выбранного сервера содержит ключи `/api/workshop/requests`, `/api/workshop/stock-summary` и `/api/workshop/sheet-requests`. Иначе остаётся прежний список заданий, приёмка, отправка, производство и склад. Отсутствие маршрута не кэшируется. Команды идут через прежний durable dispatcher: `expected_version` или создание листа, `client_token`, точное тело, без исполнителя и без частичного количества изделий.
+
+`norm_known=true` — тело manufacture без `materials`, норму считает сервер. `norm_known=false` — клиент отправляет фактические листы (`product_id`, `sheets`, `sheet_length_m`) и не подставляет норму. `null` блокирует изготовление. Отмена — `POST .../reverse` с `target=manufacture|hand_over`. Приёмка листа доступна только в статусе `confirmed` и с действием `receive`. Подтверждение и отгрузку делает менеджер не в этом приложении.
+
+Репозиторий `github.com/grigorievevgeny770-ops/sklad` из этого окружения отвечает 404, поэтому серверная реализация в sklad сюда не вошла. Ниже остаётся требуемый контракт.
+
+## 2026-11-06 — заявки цеха, требуемый контракт
 
 Согласованная схема (заявка на изделия, общие статусы без исполнителя, цех режет только плоский лист и выпускает доборные элементы) сопоставлена с этим контрактом. Android не создаёт заявку, не пишет статус и не хранит id каталогов.
 

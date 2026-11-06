@@ -44,42 +44,28 @@ class ManufacturingViewModelTest {
         override suspend fun execution(taskId: Long, executionId: Long): Outcome<Execution> = error("unused")
         override suspend fun history(taskId: Long, limit: Int, offset: Long): Outcome<Page<HistoryEntry>> = error("unused")
     }
-    private class Stock(private val flatSheet: Boolean = true) : StockRepository {
-        private val length = BigDecimal("1.250")
-        override suspend fun stock(warehouseId: Long, filter: StockFilter, limit: Int, offset: Long): Outcome<Page<StockPosition>> = Outcome.Success(Page(listOf(StockPosition(warehouseId, 301, if (flatSheet) "Лист" else "Конёк", null, if (flatSheet) "м²" else "шт", BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TEN, BigDecimal.TEN, BigDecimal.ZERO,
-            if (flatSheet) listOf(StockDimension(length, BigDecimal.TEN, 4, BigDecimal.ZERO, 0, BigDecimal.TEN, 4)) else emptyList())), 1, limit, offset))
+    private class Stock : StockRepository {
+        override suspend fun stock(warehouseId: Long, filter: StockFilter, limit: Int, offset: Long): Outcome<Page<StockPosition>> = Outcome.Success(Page(listOf(StockPosition(warehouseId,301,"Материал",null,"шт",BigDecimal.TEN,BigDecimal.ZERO,BigDecimal.TEN,BigDecimal.TEN,BigDecimal.ZERO,emptyList())),1,limit,offset))
         override suspend fun position(warehouseId: Long, productId: Long): Outcome<StockPosition> = error("unused")
-        override suspend fun products(query: String, limit: Int, offset: Long): Outcome<Page<Product>> = Outcome.Success(Page(listOf(Product(301, "Лист", "м²", flatSheet, null)), 1, limit, offset))
-        override suspend fun product(productId: Long): Outcome<Product> = Outcome.Success(Product(productId, if (flatSheet) "Лист" else "Конёк", if (flatSheet) "м²" else "шт", flatSheet, null))
-        override suspend fun definition(productId: Long): Outcome<StockDefinition> = Outcome.Success(StockDefinition(productId, "Лист", null, "м²", flatSheet, null, emptyList()))
+        override suspend fun products(query: String, limit: Int, offset: Long): Outcome<Page<Product>> = Outcome.Success(Page(listOf(Product(301, "Материал", "шт", false, null)), 1, limit, offset))
+        override suspend fun product(productId: Long): Outcome<Product> = Outcome.Success(Product(productId,"Материал","шт",false,null))
+        override suspend fun definition(productId: Long): Outcome<StockDefinition> = Outcome.Success(StockDefinition(productId, "Материал", null, "шт", false, null, listOf(ProductUnit("шт", BigDecimal.ONE))))
     }
     private class Pending : PendingCommandRepository {
         val commands = MutableStateFlow(emptyList<PendingCommand>())
         override fun observe() = commands
         override suspend fun retry(commandId: String): CommandOutcome = error("retry only through recovery screen")
     }
-    private fun vm(tasks: Tasks, pending: Pending = Pending(), stock: Stock = Stock()) = ManufacturingViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), PrepareManufacturingUseCase(), PreviewManufacturingUseCase(tasks), ExecuteManufacturingUseCase(tasks), LoadStockUseCase(stock), LoadProductUseCase(stock), LoadStockDefinitionUseCase(stock), pending)
+    private fun vm(tasks: Tasks, pending: Pending = Pending()) = ManufacturingViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), PrepareManufacturingUseCase(), PreviewManufacturingUseCase(tasks), ExecuteManufacturingUseCase(tasks), LoadStockUseCase(Stock()), LoadProductUseCase(Stock()), LoadStockDefinitionUseCase(Stock()), pending)
     private fun TestScope.prototypeInput(vm: ManufacturingViewModel) {
         vm.onIntent(ManufacturingIntent.OutputQuantityChanged("2"))
-        vm.onIntent(ManufacturingIntent.CatalogQueryChanged("Лист"))
+        vm.onIntent(ManufacturingIntent.CatalogQueryChanged("Материал"))
         advanceTimeBy(300)
         runCurrent()
-        vm.onIntent(ManufacturingIntent.AddMaterial(301, BigDecimal("1.250")))
-        runCurrent()
-        val id = vm.uiState.value.materials.single().id
-        vm.onIntent(ManufacturingIntent.MaterialChanged(id, PrototypeMaterialField.SHEETS, "2"))
-    }
-    @Test fun finishedGoodsAreNotOfferedAsRawSheet() = runTest(dispatcher) {
-        val tasks = Tasks().apply { current = productionTask(prototype = true) }
-        val vm = vm(tasks, stock = Stock(flatSheet = false))
-        runCurrent()
-        vm.onIntent(ManufacturingIntent.CatalogQueryChanged("Конёк"))
-        advanceTimeBy(300)
-        runCurrent()
-        assertTrue(vm.uiState.value.catalog.isEmpty())
         vm.onIntent(ManufacturingIntent.AddMaterial(301))
         runCurrent()
-        assertTrue(vm.uiState.value.materials.isEmpty())
+        val id = vm.uiState.value.materials.single().id
+        vm.onIntent(ManufacturingIntent.MaterialChanged(id, PrototypeMaterialField.QUANTITY, "4"))
     }
     @Test fun editsInvalidatePreviewAndLateOlderPreviewCannotReplaceCurrentBinding() = runTest(dispatcher) {
         val tasks = Tasks()

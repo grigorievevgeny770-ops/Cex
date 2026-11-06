@@ -16,21 +16,22 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.awaitCancellation
 import com.logunovinc.workshopmanager.core.ui.QuantityFormatter
 import com.logunovinc.workshopmanager.core.ui.RefreshableContent
+import com.logunovinc.workshopmanager.domain.order.StockSummaryLine
 import com.logunovinc.workshopmanager.domain.stock.*
 
 @Composable
-fun StockListRoute(viewModel: StockListViewModel, onPositionClick: (Long) -> Unit) {
+fun StockListRoute(viewModel: StockListViewModel, onPositionClick: (Long) -> Unit, onSheets: () -> Unit = {}) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(viewModel, lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
         if (!viewModel.uiState.value.loading) viewModel.onIntent(StockListIntent.Refresh)
         awaitCancellation()
     } }
-    StockListScreen(state, viewModel::onIntent, onPositionClick)
+    StockListScreen(state, viewModel::onIntent, onPositionClick, onSheets)
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit, onPositionClick: (Long) -> Unit) {
+fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit, onPositionClick: (Long) -> Unit, onSheets: () -> Unit = {}) {
     RefreshableContent(
         refreshing = state.pullRefreshing,
         enabled = !state.loading && !state.refreshing && !state.loadingMore,
@@ -38,16 +39,27 @@ fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit
         automaticLoading = state.loading || state.refreshing || state.loadingMore,
     ) {
     Column(Modifier.fillMaxSize().padding(start = 16.dp, top = 12.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Остатки", style = MaterialTheme.typography.headlineMedium)
-        OutlinedTextField(value = state.filter.query, onValueChange = { onIntent(StockListIntent.QueryChanged(it)) }, label = { Text("Найти плоский лист") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Text(if (state.summary == null) "Склад цеха" else "Остатки", style = MaterialTheme.typography.headlineMedium)
+        if (state.summary == null) OutlinedTextField(value = state.filter.query, onValueChange = { onIntent(StockListIntent.QueryChanged(it)) }, label = { Text("Найти товар") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        if (state.showSheetRequests) OutlinedButton(onClick = onSheets, modifier = Modifier.testTag("sheet-requests")) { Text("Плоский лист") }
         state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error); TextButton(onClick = { onIntent(StockListIntent.Refresh) }) { Text("Повторить") } }
             LazyColumn(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
-                item { Text("Плоский лист", style = MaterialTheme.typography.titleLarge) }
-                if (state.unverified > 0) item { Text("Часть остатков не сверена с каталогом и не показана") }
-                if (state.items.isEmpty() && !state.loading && state.error == null) item { Text("Плоского листа по этому запросу нет") }
-                items(state.items, key = StockPosition::productId) { position ->
+                val summary = state.summary
+                if (summary != null) {
+                    item { Text("Плоский лист", style = MaterialTheme.typography.titleLarge) }
+                    if (summary.flatSheet.isEmpty()) item { Text("Плоского листа нет") }
+                    items(summary.flatSheet, key = { "sheet-${it.productId}-${it.size}" }) { SummaryLine(it) }
+                    item { Text("Готовая продукция, ожидающая передачи", style = MaterialTheme.typography.titleLarge) }
+                    if (summary.awaitingTransfer.isEmpty()) item { Text("Ничего не ожидает передачи") }
+                    items(summary.awaitingTransfer, key = { "wait-${it.productId}-${it.size}" }) { SummaryLine(it) }
+                    item { Text("Передано за день", style = MaterialTheme.typography.titleLarge) }
+                    if (summary.transferredOn.isEmpty()) item { Text("Сегодня ещё ничего не передано") }
+                    items(summary.transferredOn, key = { "sent-${it.productId}-${it.size}" }) { SummaryLine(it) }
+                }
+                if (summary == null && state.items.isEmpty() && !state.loading && state.error == null) item { Text("Позиций по этому запросу нет") }
+                if (summary == null) items(state.items, key = StockPosition::productId) { position ->
                     Card(Modifier.fillMaxWidth().clickable { onPositionClick(position.productId) }) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(position.productName ?: "Плоский лист", style = MaterialTheme.typography.titleMedium)
+                        Text(position.productName ?: "Товар", style = MaterialTheme.typography.titleMedium)
                         StockTotals(position)
                         position.dimensions.take(3).forEach { dimension ->
                             Text("${QuantityFormatter.format(dimension.length)} м · ${dimension.sheets} листов · свободно ${dimension.freeSheets?.toString() ?: "неизвестно"}")
@@ -55,9 +67,7 @@ fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit
                         if (position.dimensions.any { it.free == null || it.freeSheets == null }) Text("Свободный остаток по размерам неизвестен")
                     } }
                 }
-                if (state.hasMore) item { OutlinedButton(onClick = { onIntent(StockListIntent.LoadMore) }, enabled = !state.loadingMore, modifier = Modifier.fillMaxWidth()) { Text(if (state.loadingMore) "Загружаем…" else "Ещё лист") } }
-                item { UnavailableStockSection("Готовая продукция, ожидающая передачи") }
-                item { UnavailableStockSection("Передано за день") }
+                if (state.hasMore) item { OutlinedButton(onClick = { onIntent(StockListIntent.LoadMore) }, enabled = !state.loadingMore, modifier = Modifier.fillMaxWidth()) { Text(if (state.loadingMore) "Загружаем…" else "Ещё товары") } }
             }
         }
     }
@@ -81,8 +91,7 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
                 Text(position?.productName ?: "Позиция склада", style = MaterialTheme.typography.headlineMedium)
                 state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
             }
-            if (position != null && state.flatSheet == false) item { Text("Это не плоский лист. Цех пока учитывает здесь только его.") }
-            if (position != null && state.flatSheet == true) {
+            if (position != null) {
                 item {
                     StockTotals(position)
                     if (position.unallocatedStock.signum() != 0 && position.dimensions.isNotEmpty()) Text("Без размера: ${QuantityFormatter.format(position.unallocatedStock)} ${position.baseUnit}")
@@ -101,11 +110,8 @@ fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -
     }
 }
 @Composable
-private fun UnavailableStockSection(title: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
-        Text("Сервер склада пока не сообщает этот список")
-    }
+private fun SummaryLine(line: StockSummaryLine) {
+    Text("${line.productName}${line.size?.let { " · $it" }.orEmpty()}: ${QuantityFormatter.format(line.quantity)} ${line.unit}${line.sheets?.let { " · $it листов" }.orEmpty()}")
 }
 @Composable
 private fun StockTotals(position: StockPosition) {

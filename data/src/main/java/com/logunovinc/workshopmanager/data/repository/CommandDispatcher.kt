@@ -37,7 +37,7 @@ class CommandDispatcher(
     suspend fun submit(taskId: Long, action: String, method: String, path: String, summary: CommandSummary, expectedSession: SessionSnapshot? = null, body: (String) -> ByteArray): CommandOutcome {
         val profile = current.snapshot() ?: return unauthenticated()
         if (expectedSession != null && profile != expectedSession) return unauthenticated()
-        if (taskId <= 0 || method != "POST" || !(path.matches(Regex("/?api/workshop/(v2/)?tasks/$taskId/(executions|manufacturing-executions)")) || path.matches(Regex("/?api/workshop/tasks/$taskId/close-incomplete"))))
+        if (taskId <= 0 || method != "POST" || !allowedCommand(taskId, path))
             return CommandOutcome.Rejected(null, AppError(ErrorKind.VALIDATION, "Недопустимая складская команда"))
         return locks.withTask(profile.baseUrl, profile.actorId, taskId) {
             if (!current.matches(profile)) return@withTask unauthenticated()
@@ -96,7 +96,10 @@ class CommandDispatcher(
             val response = sender.send(attempt, profile)
             if (response.status == 200) {
                 val ack = json.decodeFromString<CommandAckDto>(response.body)
-                require(ack.task.id == saved.taskId && ack.result.id == saved.taskId && ack.task.version > 0)
+                val snapshot = requireNotNull(ack.snapshot) { "Missing command snapshot" }
+                val createdSheet = saved.path.removePrefix("/") == "api/workshop/sheet-requests"
+                if (createdSheet) require(ack.result.id > 0 && snapshot.id == ack.result.id && snapshot.version > 0)
+                else require(snapshot.id == saved.taskId && ack.result.id == saved.taskId && snapshot.version > 0)
                 val acknowledged = attempt.copy(state = PendingState.ACKNOWLEDGED.name, ackBody = response.body, executionId = ack.result.executionId, lastError = null)
                 try { journal.update(acknowledged, releaseSlot = true) }
                 catch (error: Exception) {
@@ -129,4 +132,16 @@ class CommandDispatcher(
         return CommandOutcome.Unresolved(mapper.domain(uncertain), error)
     }
     private fun unauthenticated() = CommandOutcome.Rejected(null, AppError(ErrorKind.AUTHENTICATION, "Войдите тем же пользователем на тот же сервер; чужую команду отправлять нельзя"))
+    private fun allowedCommand(taskId: Long, path: String): Boolean {
+        val normalized = path.removePrefix("/")
+        return normalized == "api/workshop/tasks/$taskId/executions" ||
+            normalized == "api/workshop/v2/tasks/$taskId/manufacturing-executions" ||
+            normalized == "api/workshop/tasks/$taskId/close-incomplete" ||
+            normalized == "api/workshop/requests/$taskId/start" ||
+            normalized == "api/workshop/requests/$taskId/manufacture" ||
+            normalized == "api/workshop/requests/$taskId/hand-over" ||
+            normalized == "api/workshop/requests/$taskId/reverse" ||
+            normalized == "api/workshop/sheet-requests/$taskId/receive" ||
+            normalized == "api/workshop/sheet-requests"
+    }
 }

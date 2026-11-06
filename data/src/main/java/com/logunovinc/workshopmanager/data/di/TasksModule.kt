@@ -2,6 +2,8 @@ package com.logunovinc.workshopmanager.data.di
 
 import com.logunovinc.workshopmanager.data.remote.*
 import com.logunovinc.workshopmanager.data.repository.*
+import com.logunovinc.workshopmanager.domain.order.WorkshopOrderRepository
+import com.logunovinc.workshopmanager.domain.order.WorkshopOrders
 import com.logunovinc.workshopmanager.domain.task.*
 import com.logunovinc.workshopmanager.domain.production.*
 import com.logunovinc.workshopmanager.domain.warehouse.*
@@ -26,6 +28,9 @@ object TasksModule {
     @Provides fun dispatch(repository: TaskRepository) = ExecuteDispatchUseCase(repository)
     @Provides fun prepareReceive() = PrepareReceiveUseCase()
     @Provides fun receive(repository: TaskRepository) = ExecuteReceiveUseCase(repository)
+    @Provides @Singleton fun orders(remote: WorkshopRemoteDataSource, dispatcher: CommandDispatcher, json: Json, errors: ApiErrorMapper): WorkshopOrderRepository =
+        RealWorkshopOrderRepository(remote, dispatcher, json, errors)
+    @Provides fun workshopOrders(repository: WorkshopOrderRepository) = WorkshopOrders(repository)
     @Provides fun resolve(repository: WarehouseRepository) = ResolveWorkshopUseCase(repository)
     @Provides fun loadTasks(repository: TaskRepository) = LoadTasksUseCase(repository)
     @Provides fun loadTask(repository: TaskRepository) = LoadTaskUseCase(repository)

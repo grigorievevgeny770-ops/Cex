@@ -19,7 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 @Composable
-fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, consumeCompletion: () -> String? = { null }) {
+fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, onOrderClick: (Long) -> Unit = {}, consumeCompletion: () -> String? = { null }) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val completion by rememberUpdatedState(consumeCompletion)
@@ -30,7 +30,7 @@ fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, con
             while (isActive) { delay(30_000); viewModel.onIntent(TaskListIntent.Poll) }
         }
     }
-    TaskListScreen(state, viewModel::onIntent, onTaskClick)
+    if (state.orderMode) OrderListScreen(state, viewModel::onIntent, onOrderClick) else TaskListScreen(state, viewModel::onIntent, onTaskClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,26 +43,42 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
         automaticLoading = state.loading || state.refreshing || state.loadingMore,
     ) {
     Column(Modifier.fillMaxSize().padding(start = 16.dp, top = 12.dp, end = 16.dp)) {
-        Text("Заявки", style = MaterialTheme.typography.headlineMedium)
-        Text("Изделия, которые сервер поставил в изготовление")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Задания", style = MaterialTheme.typography.headlineMedium)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(TaskView.ACTIVE to "Актуальные", TaskView.HISTORY to "История").forEach { (view, title) ->
+            listOf(TaskView.ACTIVE to "Доступные", TaskView.HISTORY to "История заданий").forEach { (view, title) ->
                 FilterChip(selected = state.filter.view == view, onClick = { onIntent(TaskListIntent.FilterChanged(state.filter.copy(view = view))) }, label = { Text(title) })
+            }
+        }
+        var menu by remember { mutableStateOf(false) }
+        Box {
+            OutlinedButton(onClick = { menu = true }) { Text(state.filter.type?.title() ?: "Все типы") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                (listOf<TaskType?>(null) + TaskType.entries.filter { it != TaskType.UNKNOWN }).forEach { type ->
+                    DropdownMenuItem(text = { Text(type?.title() ?: "Все типы") }, onClick = { menu = false; onIntent(TaskListIntent.FilterChanged(state.filter.copy(type = type))) })
+                }
             }
         }
         state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error); TextButton(onClick = { onIntent(TaskListIntent.Refresh) }) { Text("Повторить загрузку") } }
             LazyColumn(Modifier.weight(1f).fillMaxSize().testTag("task-list"), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
-                if (!state.loading && state.error == null && state.items.isEmpty()) item { Text(if (state.filter.view == TaskView.HISTORY) "В истории заявок пока ничего нет" else "Актуальных заявок нет. Потяните вниз для обновления") }
+                if (!state.loading && state.error == null && state.items.isEmpty()) item { Text("Доступных заданий пока нет. Потяните вниз для обновления") }
                 items(state.items, key = Task::id) { task ->
+                    val displayedLines = task.lines.filter { task.type != TaskType.MANUFACTURE_PRODUCT || it.role == "output" }
                     Card(Modifier.fillMaxWidth().testTag("task-card-${task.id}").clickable { onTaskClick(task.id) }) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(task.workshopStage().title(), style = MaterialTheme.typography.titleMedium)
-                            val products = task.productRequestLines()
-                            if (products.isEmpty()) Text("В этой карточке нет изделий заявки")
-                            products.forEach { line -> RequestLineText(line) }
-                            Text(task.dueAt?.let { "Нужно к ${localDay(it)}" } ?: "Дата не указана")
-                            if (task.comment.isNotBlank()) Text(task.comment)
-                            if (task.isClosedIncomplete) task.closedIncompleteReason?.let { Text("Причина: $it") }
+                            Text(task.type.title(), style = MaterialTheme.typography.titleMedium)
+                            if (task.isClosedIncomplete) {
+                                Text("Закрыта без полного выполнения", color = MaterialTheme.colorScheme.primary)
+                                task.closedIncompleteReason?.let { Text("Причина: $it") }
+                            }
+                            displayedLines.take(3).forEach { line ->
+                                Text(line.productName)
+                                if (state.filter.view != TaskView.ACTIVE) Text("Выполнено ${QuantityFormatter.format(line.actual)} ${line.baseUnit.orEmpty()}${line.actualSheets?.let { " · $it листов" }.orEmpty()}")
+                                Text("Осталось ${QuantityFormatter.format(line.remaining)} ${line.baseUnit.orEmpty()}${line.remainingSheets?.let { " · $it листов" }.orEmpty()}", style = MaterialTheme.typography.bodySmall)
+                                line.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
+                            }
+                            if (displayedLines.size > 3) Text("Ещё ${displayedLines.size - 3} позиций")
                         }
                     }
                 }
@@ -70,11 +86,4 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
             }
         }
     }
-}
-
-@Composable
-internal fun RequestLineText(line: TaskLine) {
-    Text(line.productName, style = MaterialTheme.typography.titleMedium)
-    Text("Количество ${QuantityFormatter.format(line.planned)} ${line.baseUnit.orEmpty()}")
-    line.sheetLength?.let { Text("Размер ${QuantityFormatter.format(it)} м") }
 }

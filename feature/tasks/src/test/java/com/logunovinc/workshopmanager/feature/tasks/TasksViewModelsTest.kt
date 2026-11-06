@@ -2,6 +2,7 @@ package com.logunovinc.workshopmanager.feature.tasks
 
 import androidx.lifecycle.SavedStateHandle
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.order.*
 import com.logunovinc.workshopmanager.domain.production.*
 import com.logunovinc.workshopmanager.domain.task.*
 import com.logunovinc.workshopmanager.domain.pending.*
@@ -47,24 +48,23 @@ class TasksViewModelsTest {
         val tasks = Tasks()
         val gate = CompletableDeferred<Unit>()
         tasks.listing = { filter, _ ->
-            if (filter.type == TaskType.MANUFACTURE_PRODUCT && filter.view == TaskView.ACTIVE) withContext(NonCancellable) { gate.await(); Outcome.Success(Page(listOf(sampleTask(1, type = TaskType.MANUFACTURE_PRODUCT)), 1, 50, 0)) }
-            else Outcome.Success(Page(listOf(sampleTask(2, type = TaskType.MANUFACTURE_PRODUCT)), 1, 50, 0))
+            if (filter.type == null) withContext(NonCancellable) { gate.await(); Outcome.Success(Page(listOf(sampleTask(1)), 1, 50, 0)) }
+            else Outcome.Success(Page(listOf(sampleTask(2, type = TaskType.DISPATCH_GOODS)), 1, 50, 0))
         }
-        val vm = TaskListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadTasksUseCase(tasks))
+        val vm = TaskListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadTasksUseCase(tasks), WorkshopOrders(NoOrders))
         runCurrent()
-        vm.onIntent(TaskListIntent.FilterChanged(TaskFilter(type = TaskType.MANUFACTURE_PRODUCT, view = TaskView.HISTORY)))
+        vm.onIntent(TaskListIntent.FilterChanged(TaskFilter(type = TaskType.DISPATCH_GOODS)))
         runCurrent()
         assertEquals(listOf(2L), vm.uiState.value.items.map(Task::id))
         gate.complete(Unit)
         runCurrent()
         assertEquals(listOf(2L), vm.uiState.value.items.map(Task::id))
-        assertEquals(TaskView.HISTORY, vm.uiState.value.filter.view)
-        assertEquals(TaskType.MANUFACTURE_PRODUCT, vm.uiState.value.filter.type)
+        assertEquals(TaskType.DISPATCH_GOODS, vm.uiState.value.filter.type)
     }
     @Test fun serverPaginationLoadsBeyondFiftyAndDoubleTapDoesNotDuplicatePage() = runTest(dispatcher) {
         val tasks = Tasks()
         tasks.listing = { _, offset -> Outcome.Success(Page((offset until minOf(offset + 50, 55)).map { sampleTask(it + 1) }, 55, 50, offset)) }
-        val vm = TaskListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadTasksUseCase(tasks))
+        val vm = TaskListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadTasksUseCase(tasks), WorkshopOrders(NoOrders))
         runCurrent()
         assertEquals(50, vm.uiState.value.items.size)
         vm.onIntent(TaskListIntent.LoadMore); vm.onIntent(TaskListIntent.LoadMore)
@@ -75,7 +75,7 @@ class TasksViewModelsTest {
     }
     @Test fun unavailableWorkshopClearsPreviouslyVisibleTasks() = runTest(dispatcher) {
         val warehouses = Warehouses()
-        val vm = TaskListViewModel(ResolveWorkshopUseCase(warehouses), LoadTasksUseCase(Tasks()))
+        val vm = TaskListViewModel(ResolveWorkshopUseCase(warehouses), LoadTasksUseCase(Tasks()), WorkshopOrders(NoOrders))
         runCurrent()
         assertFalse(vm.uiState.value.items.isEmpty())
         warehouses.result = Outcome.Success(emptyList())
@@ -289,12 +289,12 @@ class TasksViewModelsTest {
             if(filters.size==1) withContext(NonCancellable) { gate.await();Outcome.Success(Page(listOf(sampleTask(1)),1,50,0)) }
             else Outcome.Success(Page(listOf(sampleTask(2)),1,50,0))
         }
-        val vm=TaskListViewModel(ResolveWorkshopUseCase(Warehouses()),LoadTasksUseCase(tasks));runCurrent()
+        val vm=TaskListViewModel(ResolveWorkshopUseCase(Warehouses()),LoadTasksUseCase(tasks),WorkshopOrders(NoOrders));runCurrent()
         vm.onIntent(TaskListIntent.Completed("terminal-ack"));runCurrent()
         assertEquals(listOf(2L),vm.uiState.value.items.map(Task::id))
         gate.complete(Unit);runCurrent();assertEquals(listOf(2L),vm.uiState.value.items.map(Task::id))
         vm.onIntent(TaskListIntent.Completed("terminal-ack"));runCurrent();assertEquals(2,tasks.reads)
-        assertTrue(filters.all { it == TaskFilter(type = TaskType.MANUFACTURE_PRODUCT) })
+        assertTrue(filters.all { it==TaskFilter() })
     }
 
     @Test fun inlineRetryOfAlreadyClosedTaskUsesSavedIdOnceAndPublishesDurableTerminalAck() = runTest(dispatcher) {
@@ -336,4 +336,18 @@ class TasksViewModelsTest {
         vm.onIntent(TaskDetailIntent.RetryPendingClick);runCurrent();assertEquals(1,attempts)
     }
 
+}
+
+private object NoOrders : WorkshopOrderRepository {
+    override suspend fun contracts() = Outcome.Success(WorkshopContracts(false, false, false))
+    override suspend fun orders(warehouseId: Long, view: OrderView, limit: Int, offset: Long) = error("unused")
+    override suspend fun order(id: Long) = error("unused")
+    override suspend fun start(order: WorkshopOrder) = error("unused")
+    override suspend fun manufacture(order: WorkshopOrder, materials: List<SheetUse>) = error("unused")
+    override suspend fun handOver(order: WorkshopOrder) = error("unused")
+    override suspend fun reverse(order: WorkshopOrder, target: ReverseTarget) = error("unused")
+    override suspend fun stockSummary(warehouseId: Long, on: java.time.LocalDate) = error("unused")
+    override suspend fun sheetRequests(warehouseId: Long) = error("unused")
+    override suspend fun requestSheet(warehouseId: Long, productId: Long, length: java.math.BigDecimal, sheets: Int) = error("unused")
+    override suspend fun receiveSheet(request: SheetRequest) = error("unused")
 }
