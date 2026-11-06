@@ -124,7 +124,8 @@ class AuthViewModel @Inject constructor(
                 if (!clearPassword) startupPrefill = false
                 if (prefillAfterLogout) {
                     credentialsEdited = false
-                    mutableState.update { it.copy(login = "", password = "") }
+                    // Session collector may still hold the previous actor until its next emission.
+                    mutableState.update { it.copy(actor = null, login = "", password = "") }
                     applyPrefill()
                 }
             }
