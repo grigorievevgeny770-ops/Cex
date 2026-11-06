@@ -12,13 +12,14 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class TaskListUiState(
-    val loading: Boolean = true, val refreshing: Boolean = false, val loadingMore: Boolean = false,
+    val loading: Boolean = true, val refreshing: Boolean = false, val pullRefreshing: Boolean = false, val loadingMore: Boolean = false,
     val warehouse: Warehouse? = null, val filter: TaskFilter = TaskFilter(),
     val items: List<Task> = emptyList(), val total: Long = 0, val nextOffset: Long = 0,
     val hasMore: Boolean = false, val error: AppError? = null,
 )
 sealed interface TaskListIntent {
     data class Completed(val commandId: String) : TaskListIntent
+    data object PullRefresh : TaskListIntent
     data object Refresh : TaskListIntent
     data object Poll : TaskListIntent
     data object LoadMore : TaskListIntent
@@ -40,6 +41,7 @@ class TaskListViewModel @Inject constructor(private val resolve: ResolveWorkshop
                 refresh()
             }
             TaskListIntent.Refresh -> refresh()
+            TaskListIntent.PullRefresh -> if (!uiState.value.loading && !uiState.value.refreshing && !uiState.value.loadingMore) refresh(manual = true)
             TaskListIntent.Poll -> if (!uiState.value.loading && !uiState.value.refreshing && !uiState.value.loadingMore) refresh()
             TaskListIntent.LoadMore -> loadMore()
             is TaskListIntent.FilterChanged -> {
@@ -49,18 +51,39 @@ class TaskListViewModel @Inject constructor(private val resolve: ResolveWorkshop
             }
         }
     }
-    private fun refresh() {
+    private fun refresh(manual: Boolean = false) {
+        val retainedOffset = if (manual || uiState.value.items.isEmpty()) 0L else uiState.value.nextOffset
         val request = ++generation
         job?.cancel()
         val filter = uiState.value.filter
-        mutableState.update { it.copy(loading = it.items.isEmpty(), refreshing = it.items.isNotEmpty(), loadingMore = false, error = null) }
+        mutableState.update { it.copy(loading = it.items.isEmpty(), refreshing = it.items.isNotEmpty(), pullRefreshing = manual, loadingMore = false, error = null) }
         job = viewModelScope.launch {
             when (val workshop = resolve()) {
-                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, warehouse = null, items = emptyList(), total = 0, nextOffset = 0, hasMore = false, error = workshop.error) }
-                is Outcome.Success -> when (val page = loadTasks(workshop.value.id, filter)) {
-                    is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, warehouse = workshop.value, error = page.error) }
-                    is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, warehouse = workshop.value,
+                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = null, items = emptyList(), total = 0, nextOffset = 0, hasMore = false, error = workshop.error) }
+                is Outcome.Success -> when (val page = refreshRange(workshop.value.id, filter, retainedOffset)) {
+                    is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = workshop.value, error = page.error) }
+                    is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = workshop.value,
                         items = page.value.items, total = page.value.total, nextOffset = page.value.nextOffset, hasMore = page.value.hasMore, error = null) }
+                }
+            }
+        }
+    }
+    private data class RangeSnapshot(val items: List<Task>, val total: Long, val nextOffset: Long, val hasMore: Boolean)
+
+    /** Refresh every previously loaded page so switching tabs preserves the scroll range. */
+    private suspend fun refreshRange(warehouseId: Long, filter: TaskFilter, retainedOffset: Long): Outcome<RangeSnapshot> {
+        var offset = 0L
+        val items = mutableListOf<Task>()
+        while (true) {
+            when (val result = loadTasks(warehouseId, filter, offset)) {
+                is Outcome.Failure -> return result
+                is Outcome.Success -> {
+                    val page = result.value
+                    items.addAll(page.items)
+                    if (!page.hasMore || page.nextOffset >= retainedOffset || page.nextOffset <= offset) {
+                        return Outcome.Success(RangeSnapshot(items.distinctBy(Task::id), page.total, page.nextOffset, page.hasMore))
+                    }
+                    offset = page.nextOffset
                 }
             }
         }

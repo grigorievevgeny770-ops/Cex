@@ -29,6 +29,7 @@ sealed interface ReceiveExecutionIntent {
     data object ReviewClick : ReceiveExecutionIntent
     data object DismissReview : ReceiveExecutionIntent
     data object ConfirmClick : ReceiveExecutionIntent
+    data object PullRefresh : ReceiveExecutionIntent
     data object Refresh : ReceiveExecutionIntent
 }
 @HiltViewModel
@@ -66,7 +67,8 @@ class ReceiveExecutionViewModel @Inject constructor(savedStateHandle: SavedState
             }
             ReceiveExecutionIntent.DismissReview -> if (current.result != ExecutionResultState.Sending) mutableState.update { it.copy(review = null) }
             ReceiveExecutionIntent.ConfirmClick -> confirm()
-            ReceiveExecutionIntent.Refresh -> if (current.canRefresh) refresh(resetInputs = false, manual = true)
+            ReceiveExecutionIntent.Refresh -> if (current.canRefresh) refresh(resetInputs = false)
+            ReceiveExecutionIntent.PullRefresh -> if (current.canRefresh) refresh(resetInputs = false, manual = true)
         }
     }
     private fun confirm() {

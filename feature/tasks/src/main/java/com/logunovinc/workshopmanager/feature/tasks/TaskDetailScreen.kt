@@ -39,13 +39,12 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
     val keyboard=LocalSoftwareKeyboardController.current
     val task = state.task
     var showExecutions by remember(task?.id) { mutableStateOf(false) }
-    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(TaskDetailIntent.Refresh) }) {
+    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(TaskDetailIntent.PullRefresh) }, automaticLoading = state.loading || state.closeChecking || state.closeSending || state.retrying || state.executionsLoading || state.historyLoading) {
         LazyColumn(Modifier.fillMaxSize().testTag("task-detail-list").padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(task?.type?.title() ?: "Задание", style = MaterialTheme.typography.headlineSmall)
                 }
-                if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
                 state.retryError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
                 state.closeError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
                 if (state.closeChecking) Text("Проверяем…")
@@ -88,7 +87,7 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                     TextButton(onClick = { showExecutions = !showExecutions }, modifier = Modifier.testTag("task-history-toggle")) { Text(if (showExecutions) "Скрыть историю" else "История") }
                 }
                 if (showExecutions) {
-                    item { state.executionsError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }; if (state.executionsLoading) LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                    item { state.executionsError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) } }
                     items(state.executions, key = { "execution-${it.id}" }) { execution ->
                         Card(Modifier.fillMaxWidth().testTag("execution-${execution.id}")) { Column(Modifier.padding(12.dp)) {
                             Text(localDate(execution.at))
@@ -127,7 +126,6 @@ fun TaskDetailScreen(state: TaskDetailUiState, onIntent: (TaskDetailIntent) -> U
                 OutlinedTextField(value = dialog.reason, onValueChange = { onIntent(TaskDetailIntent.CloseReasonChanged(it)) },
                     label = { Text("Причина закрытия") }, enabled = !state.closeSending, modifier = Modifier.fillMaxWidth().testTag("close-incomplete-reason"))
                 state.closeError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
-                if (state.closeSending) LinearProgressIndicator(Modifier.fillMaxWidth())
             } },
             confirmButton = { Button(onClick = { focus.clearFocus();keyboard?.hide();onIntent(TaskDetailIntent.ConfirmClose) }, enabled = !state.closeSending && state.pending == null,
                 modifier = Modifier.testTag("close-incomplete-confirm")) { Text(if (state.closeSending) "Закрываем…" else "Закрыть задачу") } },

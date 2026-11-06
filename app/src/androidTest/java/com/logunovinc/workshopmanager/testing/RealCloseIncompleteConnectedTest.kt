@@ -59,7 +59,9 @@ class RealCloseIncompleteConnectedTest {
         open(key,"Изготовление");tag("task-detail-list","task-manufacturing")
         tag("manufacturing-list","manufacturing-output-qty");compose.onNodeWithTag("manufacturing-output-qty").performTextReplacement(if(prototype) "2" else "3")
         if(prototype) {
-            click("manufacturing-list",hasText("Найти материалы"));val id=scenario.getValue("materialId").jsonPrimitive.long
+            compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasText("Поиск материала"))
+            compose.onNodeWithText("Поиск материала").performTextInput("Материал")
+            val id=scenario.getValue("materialId").jsonPrimitive.long
             compose.waitUntil(20_000) { compose.onAllNodesWithTag("prototype-add-$id").fetchSemanticsNodes().isNotEmpty() }
             tag("manufacturing-list","prototype-add-$id");tag("manufacturing-list","prototype-material-qty-1")
             compose.onNodeWithTag("prototype-material-qty-1").performTextInput("4")

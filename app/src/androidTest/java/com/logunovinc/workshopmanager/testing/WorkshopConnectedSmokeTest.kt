@@ -90,8 +90,8 @@ class WorkshopConnectedSmokeTest {
         clickInList("task-detail-list", "task-manufacturing")
         compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasTestTag("manufacturing-output-qty"))
         compose.onNodeWithTag("manufacturing-output-qty").performTextInput("2")
-        compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasText("Найти материалы"))
-        compose.onNodeWithText("Найти материалы").performClick()
+        compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasText("Поиск материала"))
+        compose.onNodeWithText("Поиск материала").performTextInput("Материал")
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("prototype-add-301").fetchSemanticsNodes().isNotEmpty() }
         clickInList("manufacturing-list", "prototype-add-301")
         compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasTestTag("prototype-material-qty-1"))
@@ -167,6 +167,24 @@ class WorkshopConnectedSmokeTest {
         compose.onNodeWithTag("receive-list").performScrollToIndex(0);waitText("Исход неизвестен",true)
         compose.onNodeWithTag("receive-list").assertIsDisplayed();compose.onNodeWithTag("task-list").assertDoesNotExist()
         assertEquals(0,backend.backend.executions.get())
+    }
+
+    @Test fun physicalTouchOpensTaskCard() {
+        login()
+        compose.onNodeWithTag("task-card-101").performScrollTo().performTouchInput { click() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-detail-list").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-detail-list").assertIsDisplayed()
+    }
+
+    @Test fun physicalProductTextTapDuringRefreshOpensTask() {
+        login()
+        val reads=backend.backend.taskListReads.get()
+        backend.backend.taskPageDelayMillis=2500
+        compose.onNodeWithTag("task-list").performTouchInput { swipeDown() }
+        compose.waitUntil(10_000) { backend.backend.taskListReads.get()>reads }
+        compose.onNodeWithText("Материал",useUnmergedTree=true).performTouchInput { click() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-detail-list").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-detail-list").assertIsDisplayed()
     }
 
 }

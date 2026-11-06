@@ -30,19 +30,18 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val task = state.task
-    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(ReceiveExecutionIntent.Refresh) }) {
+    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(ReceiveExecutionIntent.PullRefresh) }, automaticLoading = state.loading || state.result == ExecutionResultState.Sending) {
         LazyColumn(Modifier.fillMaxSize().testTag("receive-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Text("Приёмка", style = MaterialTheme.typography.headlineMedium)
                 Text("Укажите, сколько прибыло сейчас")
                 if (state.final) Text("Можно принять 0. Ранее принятое сохранится, недостачу разберёт руководитель")
-                if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
                 state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
                 when (val result = state.result) {
                     is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary) }
                     is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error) }
                     is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
-                    ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    ExecutionResultState.Sending -> Unit
                     else -> Unit
                 }
                 state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) } }
@@ -80,7 +79,7 @@ fun ReceiveExecutionScreen(state: ReceiveExecutionUiState, onIntent: (ReceiveExe
                 if (review.lines.isEmpty()) Text("В этом шаге не прибыло ни одного товара")
                 review.lines.forEach { actual ->
                     val line = task?.lines?.firstOrNull { it.id == actual.taskLineId }
-                    val amount = actual.sheets?.let { "$it листов" } ?: "${actual.quantity?.toPlainString()?.replace('.', ',')} ${line?.baseUnit.orEmpty()}"
+                    val amount = actual.sheets?.let { "$it листов" } ?: "${actual.quantity?.let(QuantityFormatter::format) ?: "—"} ${line?.baseUnit.orEmpty()}"
                     Text("${line?.productName.orEmpty()}: $amount")
                     line?.sheetLength?.let { Text("Длина ${QuantityFormatter.format(it)} м") }
                 }

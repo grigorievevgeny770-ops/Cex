@@ -19,6 +19,9 @@ import com.logunovinc.workshopmanager.feature.auth.AuthRoute
 import com.logunovinc.workshopmanager.feature.auth.AuthViewModel
 import com.logunovinc.workshopmanager.feature.tasks.*
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.navigation
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.logunovinc.workshopmanager.feature.stock.*
@@ -49,37 +52,48 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
     }, actions = { TextButton(onClick = onLogout) { Text("Выйти") } }) }, bottomBar = {
         if (route != "login") NavigationBar {
             listOf("tasks" to "Задания", "stock" to "Склад цеха").forEach { (destination, title) ->
-                NavigationBarItem(modifier = Modifier.testTag("nav-$destination"), selected = route == destination, onClick = {
-                    navController.navigate(destination) { launchSingleTop = true; popUpTo("tasks") }
+                NavigationBarItem(modifier = Modifier.testTag("nav-$destination"), selected = entry?.destination?.hierarchy?.any { it.route == "$destination-stack" } == true, onClick = {
+                    val stack = "$destination-stack"
+                    if (entry?.destination?.hierarchy?.none { it.route == stack } != false) {
+                        navController.navigate(stack) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 }, icon = { Text(if (destination == "tasks") "☑" else "▤") }, label = { Text(title) })
             }
         }
     }) { padding ->
-        NavHost(navController, startDestination = "tasks", modifier = Modifier.padding(padding)) {
-            composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, consumeCompletion = { entry.savedStateHandle.remove<String>("completedCommandId") }) }
-            composable("task/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }, { navController.navigate("manufacturing/$it") }, { navController.navigate("receive/$it?final=true") }, onCompleted = completed)
-            }
-            composable("receive/{taskId}?final={final}", arguments = listOf(navArgument("taskId") { type = NavType.LongType }, navArgument("final") { type = NavType.BoolType; defaultValue = false })) { entry ->
-                ReceiveExecutionRoute(hiltViewModel(entry), onCompleted = completed)
-            }
-            composable("dispatch/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                DispatchExecutionRoute(hiltViewModel(entry), onCompleted = completed)
-            }
-            composable("manufacturing/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
-                ManufacturingRoute(hiltViewModel(entry), onCompleted = completed)
-            }
-            // Migration only: Navigation 2.9 restores saved destination IDs before composing.
-            // Old saved stacks may still contain this removed screen; no recovery UI remains.
-            composable("recovery") {
-                LaunchedEffect(Unit) {
-                    if (!navController.popBackStack("tasks", false)) navController.navigate("tasks") {
-                        popUpTo("recovery") { inclusive = true }; launchSingleTop = true
+        NavHost(navController, startDestination = "tasks-stack", modifier = Modifier.padding(padding)) {
+            navigation(startDestination = "tasks", route = "tasks-stack") {
+                composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, consumeCompletion = { entry.savedStateHandle.remove<String>("completedCommandId") }) }
+                composable("task/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
+                    TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }, { navController.navigate("manufacturing/$it") }, { navController.navigate("receive/$it?final=true") }, onCompleted = completed)
+                }
+                composable("receive/{taskId}?final={final}", arguments = listOf(navArgument("taskId") { type = NavType.LongType }, navArgument("final") { type = NavType.BoolType; defaultValue = false })) { entry ->
+                    ReceiveExecutionRoute(hiltViewModel(entry), onCompleted = completed)
+                }
+                composable("dispatch/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
+                    DispatchExecutionRoute(hiltViewModel(entry), onCompleted = completed)
+                }
+                composable("manufacturing/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
+                    ManufacturingRoute(hiltViewModel(entry), onCompleted = completed)
+                }
+                // Migration only: Navigation 2.9 restores saved destination IDs before composing.
+                // Old saved stacks may still contain this removed screen; no recovery UI remains.
+                composable("recovery") {
+                    LaunchedEffect(Unit) {
+                        if (!navController.popBackStack("tasks", false)) navController.navigate("tasks") {
+                            popUpTo("recovery") { inclusive = true }; launchSingleTop = true
+                        }
                     }
                 }
             }
-            composable("stock") { entry -> StockListRoute(hiltViewModel(entry)) { navController.navigate("stock-item/$it") } }
-            composable("stock-item/{productId}", arguments = listOf(navArgument("productId") { type = NavType.LongType })) { entry -> StockDetailRoute(hiltViewModel(entry)) }
+            navigation(startDestination = "stock", route = "stock-stack") {
+                composable("stock") { entry -> StockListRoute(hiltViewModel(entry)) { navController.navigate("stock-item/$it") } }
+                composable("stock-item/{productId}", arguments = listOf(navArgument("productId") { type = NavType.LongType })) { entry -> StockDetailRoute(hiltViewModel(entry)) }
+            }
         }
     }
 }

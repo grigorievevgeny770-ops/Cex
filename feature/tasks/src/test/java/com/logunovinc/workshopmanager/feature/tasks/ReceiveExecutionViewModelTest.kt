@@ -130,7 +130,7 @@ class ReceiveExecutionViewModelTest {
     @Test fun pullRefreshPreservesFinalQuantityAndReasonDraftAndReadsOnlyOnce() = runTest(dispatcher) {
         val tasks=Tasks();val vm=vm(tasks,Pending(),finalMode=true);runCurrent()
         vm.onIntent(ReceiveExecutionIntent.QuantityChanged(1001,"4,0000"));vm.onIntent(ReceiveExecutionIntent.ReasonChanged("Остальная часть не прибыла"))
-        vm.onIntent(ReceiveExecutionIntent.Refresh);vm.onIntent(ReceiveExecutionIntent.Refresh)
+        vm.onIntent(ReceiveExecutionIntent.PullRefresh);vm.onIntent(ReceiveExecutionIntent.PullRefresh)
         assertTrue(vm.uiState.value.refreshing);runCurrent()
         assertEquals(2,tasks.reads);assertEquals(0,tasks.count);assertFalse(vm.uiState.value.refreshing)
         assertEquals("4,0000",vm.uiState.value.inputs.single().quantity);assertTrue(vm.uiState.value.final);assertEquals("Остальная часть не прибыла",vm.uiState.value.reason)

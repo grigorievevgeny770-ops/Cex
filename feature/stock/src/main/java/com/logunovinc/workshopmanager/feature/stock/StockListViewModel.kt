@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.logunovinc.workshopmanager.domain.*
 import com.logunovinc.workshopmanager.domain.stock.*
+import com.logunovinc.workshopmanager.domain.task.Page
 import com.logunovinc.workshopmanager.domain.warehouse.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -12,14 +13,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class StockListUiState(val loading: Boolean = true, val refreshing: Boolean = false, val loadingMore: Boolean = false,
+data class StockListUiState(val loading: Boolean = true, val refreshing: Boolean = false, val pullRefreshing: Boolean = false, val loadingMore: Boolean = false,
     val warehouse: Warehouse? = null, val filter: StockFilter = StockFilter(), val items: List<StockPosition> = emptyList(),
     val total: Long = 0, val nextOffset: Long = 0, val hasMore: Boolean = false, val error: AppError? = null)
 sealed interface StockListIntent {
+    data object PullRefresh : StockListIntent
     data object Refresh : StockListIntent
     data object LoadMore : StockListIntent
     data class QueryChanged(val value: String) : StockListIntent
-    data class OnlyAvailableChanged(val value: Boolean) : StockListIntent
 }
 @HiltViewModel
 class StockListViewModel @Inject constructor(private val resolve: ResolveWorkshopUseCase, private val load: LoadStockUseCase) : ViewModel() {
@@ -31,30 +32,49 @@ class StockListViewModel @Inject constructor(private val resolve: ResolveWorksho
     fun onIntent(intent: StockListIntent) {
         when (intent) {
             StockListIntent.Refresh -> refresh()
+            StockListIntent.PullRefresh -> if (!uiState.value.loading && !uiState.value.refreshing && !uiState.value.loadingMore) refresh(manual = true)
             StockListIntent.LoadMore -> more()
             is StockListIntent.QueryChanged -> {
-                mutableState.update { it.copy(filter = it.filter.copy(query = intent.value), items = emptyList(), nextOffset = 0, total = 0, hasMore = false) }
+                mutableState.update { it.copy(filter = it.filter.copy(query = intent.value, onlyAvailable = false), items = emptyList(), nextOffset = 0, total = 0, hasMore = false) }
                 refresh(debounce = true)
             }
-            is StockListIntent.OnlyAvailableChanged -> {
-                mutableState.update { it.copy(filter = it.filter.copy(onlyAvailable = intent.value), items = emptyList(), nextOffset = 0, total = 0, hasMore = false) }
-                refresh()
-            }
+
         }
     }
-    private fun refresh(debounce: Boolean = false) {
+    private fun refresh(debounce: Boolean = false, manual: Boolean = false) {
+        val retainedOffset = if (manual || uiState.value.items.isEmpty()) 0L else uiState.value.nextOffset
         val request = ++generation
         job?.cancel()
-        val filter = uiState.value.filter
-        mutableState.update { it.copy(loading = it.items.isEmpty(), refreshing = it.items.isNotEmpty(), loadingMore = false, error = null) }
+        val filter = uiState.value.filter.copy(onlyAvailable = false)
+        mutableState.update { it.copy(loading = it.items.isEmpty(), refreshing = it.items.isNotEmpty(), pullRefreshing = manual, loadingMore = false, error = null) }
         job = viewModelScope.launch {
             if (debounce) delay(300)
             when (val warehouse = resolve()) {
-                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, warehouse = null, items = emptyList(), total = 0, hasMore = false, error = warehouse.error) }
-                is Outcome.Success -> when (val page = load(warehouse.value.id, filter)) {
-                    is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, warehouse = warehouse.value, error = page.error) }
-                    is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, warehouse = warehouse.value,
+                is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = null, items = emptyList(), total = 0, hasMore = false, error = warehouse.error) }
+                is Outcome.Success -> when (val page = refreshRange(warehouse.value.id, filter, retainedOffset)) {
+                    is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value, error = page.error) }
+                    is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value,
                         items = page.value.items, total = page.value.total, nextOffset = page.value.nextOffset, hasMore = page.value.hasMore) }
+                }
+            }
+        }
+    }
+    private data class RangeSnapshot(val items: List<StockPosition>, val total: Long, val nextOffset: Long, val hasMore: Boolean)
+
+    /** Refresh every previously loaded page so switching tabs preserves the scroll range. */
+    private suspend fun refreshRange(warehouseId: Long, filter: StockFilter, retainedOffset: Long): Outcome<RangeSnapshot> {
+        var offset = 0L
+        val items = mutableListOf<StockPosition>()
+        while (true) {
+            when (val result = load(warehouseId, filter, offset)) {
+                is Outcome.Failure -> return result
+                is Outcome.Success -> {
+                    val page = result.value
+                    items.addAll(page.items)
+                    if (!page.hasMore || page.nextOffset >= retainedOffset || page.nextOffset <= offset) {
+                        return Outcome.Success(RangeSnapshot(items.distinctBy(StockPosition::productId), page.total, page.nextOffset, page.hasMore))
+                    }
+                    offset = page.nextOffset
                 }
             }
         }
@@ -66,7 +86,7 @@ class StockListViewModel @Inject constructor(private val resolve: ResolveWorksho
         val request = generation
         mutableState.update { it.copy(loadingMore = true, error = null) }
         job = viewModelScope.launch {
-            when (val page = load(warehouse.id, current.filter, current.nextOffset)) {
+            when (val page = load(warehouse.id, current.filter.copy(onlyAvailable = false), current.nextOffset)) {
                 is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loadingMore = false, error = page.error) }
                 is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loadingMore = false,
                     items = (it.items + page.value.items).distinctBy(StockPosition::productId), total = page.value.total, nextOffset = page.value.nextOffset, hasMore = page.value.hasMore) }

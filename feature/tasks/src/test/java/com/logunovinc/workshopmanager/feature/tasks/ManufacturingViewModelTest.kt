@@ -45,10 +45,10 @@ class ManufacturingViewModelTest {
         override suspend fun history(taskId: Long, limit: Int, offset: Long): Outcome<Page<HistoryEntry>> = error("unused")
     }
     private class Stock : StockRepository {
-        override suspend fun stock(warehouseId: Long, filter: StockFilter, limit: Int, offset: Long): Outcome<Page<StockPosition>> = error("unused")
+        override suspend fun stock(warehouseId: Long, filter: StockFilter, limit: Int, offset: Long): Outcome<Page<StockPosition>> = Outcome.Success(Page(listOf(StockPosition(warehouseId,301,"Материал",null,"шт",BigDecimal.TEN,BigDecimal.ZERO,BigDecimal.TEN,BigDecimal.TEN,BigDecimal.ZERO,emptyList())),1,limit,offset))
         override suspend fun position(warehouseId: Long, productId: Long): Outcome<StockPosition> = error("unused")
         override suspend fun products(query: String, limit: Int, offset: Long): Outcome<Page<Product>> = Outcome.Success(Page(listOf(Product(301, "Материал", "шт", false, null)), 1, limit, offset))
-        override suspend fun product(productId: Long): Outcome<Product> = error("unused")
+        override suspend fun product(productId: Long): Outcome<Product> = Outcome.Success(Product(productId,"Материал","шт",false,null))
         override suspend fun definition(productId: Long): Outcome<StockDefinition> = Outcome.Success(StockDefinition(productId, "Материал", null, "шт", false, null, listOf(ProductUnit("шт", BigDecimal.ONE))))
     }
     private class Pending : PendingCommandRepository {
@@ -56,10 +56,14 @@ class ManufacturingViewModelTest {
         override fun observe() = commands
         override suspend fun retry(commandId: String): CommandOutcome = error("retry only through recovery screen")
     }
-    private fun vm(tasks: Tasks, pending: Pending = Pending()) = ManufacturingViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), PrepareManufacturingUseCase(), PreviewManufacturingUseCase(tasks), ExecuteManufacturingUseCase(tasks), SearchProductsUseCase(Stock()), LoadStockDefinitionUseCase(Stock()), pending)
-    private fun prototypeInput(vm: ManufacturingViewModel) {
+    private fun vm(tasks: Tasks, pending: Pending = Pending()) = ManufacturingViewModel(SavedStateHandle(mapOf("taskId" to 101L)), LoadTaskUseCase(tasks), PrepareManufacturingUseCase(), PreviewManufacturingUseCase(tasks), ExecuteManufacturingUseCase(tasks), LoadStockUseCase(Stock()), LoadProductUseCase(Stock()), LoadStockDefinitionUseCase(Stock()), pending)
+    private fun TestScope.prototypeInput(vm: ManufacturingViewModel) {
         vm.onIntent(ManufacturingIntent.OutputQuantityChanged("2"))
-        vm.onIntent(ManufacturingIntent.AddMaterial(Product(301, "Материал", "шт", false, null)))
+        vm.onIntent(ManufacturingIntent.CatalogQueryChanged("Материал"))
+        advanceTimeBy(300)
+        runCurrent()
+        vm.onIntent(ManufacturingIntent.AddMaterial(301))
+        runCurrent()
         val id = vm.uiState.value.materials.single().id
         vm.onIntent(ManufacturingIntent.MaterialChanged(id, PrototypeMaterialField.QUANTITY, "4"))
     }
@@ -166,10 +170,10 @@ class ManufacturingViewModelTest {
         val tasks=Tasks().apply { current=productionTask(prototype=true) };val vm=vm(tasks)
         runCurrent();prototypeInput(vm);runCurrent()
         val materials=vm.uiState.value.materials
-        vm.onIntent(ManufacturingIntent.Refresh);vm.onIntent(ManufacturingIntent.Refresh);runCurrent()
+        vm.onIntent(ManufacturingIntent.PullRefresh);vm.onIntent(ManufacturingIntent.PullRefresh);runCurrent()
         assertEquals(2,tasks.reads);assertEquals("2",vm.uiState.value.output?.quantity);assertEquals(materials,vm.uiState.value.materials);assertEquals(0,tasks.writes)
         vm.onIntent(ManufacturingIntent.PreviewClick);runCurrent();vm.onIntent(ManufacturingIntent.ReviewClick)
-        vm.onIntent(ManufacturingIntent.Refresh);runCurrent()
+        vm.onIntent(ManufacturingIntent.PullRefresh);runCurrent()
         assertTrue(vm.uiState.value.reviewOpen);assertEquals(2,tasks.reads);assertNotNull(vm.uiState.value.binding)
     }
 

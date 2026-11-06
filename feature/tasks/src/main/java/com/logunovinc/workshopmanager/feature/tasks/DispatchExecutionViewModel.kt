@@ -27,6 +27,7 @@ sealed interface DispatchExecutionIntent {
     data object ReviewClick : DispatchExecutionIntent
     data object DismissReview : DispatchExecutionIntent
     data object ConfirmClick : DispatchExecutionIntent
+    data object PullRefresh : DispatchExecutionIntent
     data object Refresh : DispatchExecutionIntent
 }
 @HiltViewModel
@@ -62,7 +63,8 @@ class DispatchExecutionViewModel @Inject constructor(savedStateHandle: SavedStat
             }
             DispatchExecutionIntent.DismissReview -> if (current.result != ExecutionResultState.Sending) mutableState.update { it.copy(review = null) }
             DispatchExecutionIntent.ConfirmClick -> confirm()
-            DispatchExecutionIntent.Refresh -> if (current.canRefresh) refresh(resetInputs = false, manual = true)
+            DispatchExecutionIntent.Refresh -> if (current.canRefresh) refresh(resetInputs = false)
+            DispatchExecutionIntent.PullRefresh -> if (current.canRefresh) refresh(resetInputs = false, manual = true)
         }
     }
     private fun confirm() {

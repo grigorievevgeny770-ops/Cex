@@ -4,9 +4,9 @@
 
 ## APK и команды
 
-`app/build/outputs/apk/debug/app-debug.apk` — 14 524 473 байт.
+`app/build/outputs/apk/debug/app-debug.apk` — 14 783 773 байт.
 
-SHA256: `a1c0e6cb90c782408d6a705962069761cc73216b91eced4828e8e2418e602acd`.
+SHA256: `2be87a529a7cb52180190a0599f87267ecfa4bd1be60bcd38bd62acb08e3bde7`.
 
 APK установлен и запущен на emulator-5554/API37. Debug/release default: `https://147-45-154-211.sslip.io/` (saved environment takes precedence). SDK/JDK и настройка окружений — в README.md.
 
@@ -140,3 +140,8 @@ Actual backend baseline /tmp/tseh-terminal-ack-real-baseline/result.json PASS (t
 До нового пользовательского ограничения прошли138unit/lint/assemble (/tmp/tseh-pull-refresh-final-verify3.log), independent root verify (/tmp/tseh-pull-refresh-root-verify.log),17manualUI (/tmp/tseh-pull-refresh-manual-ui.log). Из17 три старые локальные проверки кликов не входят в коммит; в репозитории14device cases. Два новых физических swipe cases проверили один GET, сохранение ввода, блокировку во время отправки и stock4→7 без POST. После указания «тесты только по просьбе» запусков нет; дальнейшая политика в AGENTS.md. VPN/network/auth code на этом этапе не менялся.
 
 2026-11-06 debug prefill: предоставленные пользователем значения хранятся в игнорируемом local.properties и обычном debug BuildConfig; root remote HTTPS разрешён для предзаполнения без автовхода. Release/processFixture пустые. assembleDebug SUCCESS /tmp/tseh-debug-prefill-build.log; текущий Gradle вывел APK в intermediates/apk/debug, итоговый файл скопирован в привычный outputs/apk/debug. Тесты не запускались; существующие test expectations обновлены без запуска.
+
+2026-11-06 latest working changes: stock available-only selector removed; all stock requests keep onlyAvailable=false. Automatic network activity uses pinned top linear progress, only explicit PullRefresh uses the circular indicator. Debug defaults populate immediately and after logout, without autologin. Shareable debug APK built by scripts/build-debug-apk.sh with injected.testOnly=false; signature verified, no testOnly package distributed. Latest build log /tmp/tseh-final-manual-progress-prefill-build.log SUCCESS. Download alias app/build/outputs/apk/debug/ceh-debug-installable.apk. No tests or Git operations after user prohibition; changes remain uncommitted.
+
+
+2026-11-06 подготовка коммита по явному запросу пользователя: независимые стеки вкладок, сохранение ввода/прокрутки и загруженного диапазона при автообновлении; поиск материалов прототипа только по физическим остаткам цеха, пустая выдача при пустом запросе; автоматическая складская длина листа, ввод только числа листов; единый QuantityFormatter для отображения. Последняя сборка /tmp/tseh-quantity-display-build.log: assembleDebug SUCCESS, APK без testOnly, подпись проверена. Этот APK после последних изменений не устанавливался на устройство. Тесты после пользовательского ограничения не запускались. Ранее оставленные локальные проверки физических кликов включены в текущую передачу вместе с адаптациями test sources; результаты прежних запусков не являются проверкой текущих изменений. local.properties и APK в коммит не включаются.

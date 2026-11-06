@@ -109,7 +109,9 @@ class RealBackendConnectedTest {
         fun commit() { tagged("manufacturing-list","manufacturing-preview");tagged("manufacturing-list","manufacturing-review");waitText(if(prototype) "Подтвердить" else "Подтвердить выпуск?");compose.onNodeWithTag("manufacturing-confirm").performClick();confirmed("manufacturing-list") }
         output(if(prototype) "2" else "3")
         if(prototype) {
-            click("manufacturing-list",hasText("Найти материалы")); val id=scenario.getValue("materialId").jsonPrimitive.long
+             compose.onNodeWithTag("manufacturing-list").performScrollToNode(hasText("Поиск материала"))
+            compose.onNodeWithText("Поиск материала").performTextInput("Материал")
+            val id=scenario.getValue("materialId").jsonPrimitive.long
             compose.waitUntil(20_000) { compose.onAllNodesWithTag("prototype-add-$id").fetchSemanticsNodes().isNotEmpty() };tagged("manufacturing-list","prototype-add-$id")
             tagged("manufacturing-list","prototype-material-qty-1");compose.onNodeWithTag("prototype-material-qty-1").performTextInput("4")
         }

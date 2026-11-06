@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -32,14 +31,17 @@ fun StockListRoute(viewModel: StockListViewModel, onPositionClick: (Long) -> Uni
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StockListScreen(state: StockListUiState, onIntent: (StockListIntent) -> Unit, onPositionClick: (Long) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    RefreshableContent(
+        refreshing = state.pullRefreshing,
+        enabled = !state.loading && !state.refreshing && !state.loadingMore,
+        onRefresh = { onIntent(StockListIntent.PullRefresh) },
+        automaticLoading = state.loading || state.refreshing || state.loadingMore,
+    ) {
+    Column(Modifier.fillMaxSize().padding(start = 16.dp, top = 12.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Склад цеха", style = MaterialTheme.typography.headlineMedium)
         OutlinedTextField(value = state.filter.query, onValueChange = { onIntent(StockListIntent.QueryChanged(it)) }, label = { Text("Найти товар") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Row { Switch(checked = state.filter.onlyAvailable, onCheckedChange = { onIntent(StockListIntent.OnlyAvailableChanged(it)) }); Text("Только свободные") }
-        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error); TextButton(onClick = { onIntent(StockListIntent.Refresh) }) { Text("Повторить") } }
-        PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = { onIntent(StockListIntent.Refresh) }, modifier = Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
+            LazyColumn(Modifier.weight(1f).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
                 if (state.items.isEmpty() && !state.loading && state.error == null) item { Text("Позиций по этому запросу нет") }
                 items(state.items, key = StockPosition::productId) { position ->
                     Card(Modifier.fillMaxWidth().clickable { onPositionClick(position.productId) }) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -69,11 +71,10 @@ fun StockDetailRoute(viewModel: StockDetailViewModel) {
 @Composable
 fun StockDetailScreen(state: StockDetailUiState, onIntent: (StockDetailIntent) -> Unit) {
     val position = state.position
-    RefreshableContent(state.refreshing, !state.loading, { onIntent(StockDetailIntent.Refresh) }) {
+    RefreshableContent(state.refreshing, !state.loading, { onIntent(StockDetailIntent.PullRefresh) }, automaticLoading = state.loading) {
         LazyColumn(Modifier.fillMaxSize().testTag("stock-detail-list").padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
             item {
                 Text(position?.productName ?: "Позиция склада", style = MaterialTheme.typography.headlineMedium)
-                    if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
                 state.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
             }
             if (position != null) {

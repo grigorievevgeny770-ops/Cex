@@ -33,6 +33,8 @@ class SyntheticWorkshopBackend : AutoCloseable {
     val stockReads = AtomicInteger()
     val taskListReads = AtomicInteger()
     @Volatile var ackBodyDelayMillis = 0L
+    @Volatile var taskPageDelayMillis = 0L
+    @Volatile var additionalTask = false
     @Volatile var failReceiveOnce = false
     @Volatile var lastManufacturingBody = ""
     @Volatile var receiveFinal = false
@@ -40,6 +42,9 @@ class SyntheticWorkshopBackend : AutoCloseable {
     private var accepted = 0
     private var version = 2L
     private val receipts = mutableMapOf<String, String>()
+    private fun secondTask() = task().replace("\"id\":101,","\"id\":102,").replace("Материал","Другой товар")
+        .replace("\"is_closed_incomplete\":true","\"is_closed_incomplete\":false")
+        .replace("\"allowed_actions\":[]","\"allowed_actions\":[\"execute\"]")
     private fun fixture(name: String) = InstrumentationRegistry.getInstrumentation().context.assets.open("production-v2/$name.json").bufferedReader().use { it.readText() }
     private fun response(body: String, status: Int = 200) = MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json").setBody(body)
     private fun task(): String = if(closeScenario) closeTask() else if (prototypeScenario) fixture(when (manufacturingExecutions.get()) { 0 -> "prototype_task"; 1 -> "prototype_ready_task"; else -> "prototype_after_next3" }) else """{"id":101,"type":"RECEIVE_GOODS","status":"${if (receiveFinal) "completed" else if (accepted == 0) "new" else "partially_completed"}","version":$version,"warehouse_id":42,"assignee_user_id":${if (accepted == 0) "null" else "42"},"created_by":1,"created_at":"2026-11-01T12:00:00Z","comment":"Synthetic UI task","transfer_version":$version,"outcome":${if(receiveFinal && accepted<10) "\"shortage\"" else "null"},"allowed_actions":["start","execute"],"lines":[{"id":1001,"product_id":301,"product_name":"Материал","role":"receive","base_unit":"шт","planned_qty":"10","actual_qty":"$accepted","remaining_qty":"${10 - accepted}"}]}"""
@@ -66,9 +71,13 @@ class SyntheticWorkshopBackend : AutoCloseable {
                     taskListReads.incrementAndGet()
                     val terminal=closeClosed || receiveFinal
                     val view=request.requestUrl!!.queryParameter("view")
-                    return response(if ((view=="active" && terminal) || (view=="history" && !terminal)) page("",0) else page(task()))
+                    val first=if ((view=="active" && terminal) || (view=="history" && !terminal)) null else task()
+                    val second=if(additionalTask && view!="history") secondTask() else null
+                    val items=listOfNotNull(first,second)
+                    return response("""{"items":[${items.joinToString(",")}],"total":${items.size},"limit":50,"offset":0}""").setBodyDelay(taskPageDelayMillis,java.util.concurrent.TimeUnit.MILLISECONDS)
                 }
                 if (path == "/api/workshop/tasks/101") return response(task())
+                if (path == "/api/workshop/tasks/102") return response(secondTask())
                 if (path == "/api/workshop/tasks/101/start") { starts.incrementAndGet(); return response("""{"code":"TEST_ERROR","message":"Smoke must not automatically start"}""", 409) }
                 if (path == "/api/workshop/tasks/101/executions" && request.method == "POST") {
                     if(failReceiveOnce) { failReceiveOnce=false;return response("""{"code":"INTERNAL_ERROR","message":"Unknown result"}""",500) }
@@ -86,7 +95,8 @@ class SyntheticWorkshopBackend : AutoCloseable {
                 }
                 if (path == "/api/workshop/tasks/101/executions") return response(if (accepted == 0) page("", 0) else page("""{"id":5001,"task_id":101,"executed_by":42,"executed_at":"2026-11-01T12:02:00Z","comment":"Synthetic received","final":false,"lines":[{"task_line_id":1001,"product_id":301,"role":"receive","actual_qty":"4"}]}"""))
                 if (path == "/api/workshop/tasks/101/history") return response(if (accepted == 0) page("", 0) else page("""{"id":6001,"event_type":"executed","actor_id":42,"created_at":"2026-11-01T12:02:00Z","details":{"execution_id":5001}}"""))
-                if (path == "/api/warehouses/42/stock") { stockReads.incrementAndGet(); return response(page("""{"warehouse_id":42,"product_id":301,"product_name":"Материал","base_unit":"шт","qty":"$accepted","reserved":"0","free":"$accepted","unallocated_stock":"$accepted","unallocated_reserved":"0","dimensions":[]}""")) }
+                if (path == "/api/warehouses/42/stock") { stockReads.incrementAndGet(); val stockQty = if (prototypeScenario) 50 else accepted; return response(page("""{"warehouse_id":42,"product_id":301,"product_name":"Материал","base_unit":"шт","qty":"$stockQty","reserved":"0","free":"$stockQty","unallocated_stock":"$stockQty","unallocated_reserved":"0","dimensions":[]}""")) }
+                if (path == "/api/products/301") return response("""{"id":301,"name":"Материал","base_unit":"шт","is_sheet":false}""")
                 if (path == "/api/products") return response(page("""{"id":301,"name":"Материал","base_unit":"шт","is_sheet":false}"""))
                 if (path == "/api/products/301/stock-definition") return response("""{"id":301,"name":"Материал","base_unit":"шт","is_sheet":false,"units":[{"name":"шт","coefficient":"1"}]}""")
                 if (path == "/api/workshop/v2/tasks/101/manufacturing-preview") {

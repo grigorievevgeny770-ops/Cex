@@ -36,6 +36,7 @@ sealed interface TaskDetailIntent {
     data object DismissClose : TaskDetailIntent
     data object ConfirmClose : TaskDetailIntent
     data object RetryPendingClick : TaskDetailIntent
+    data object PullRefresh : TaskDetailIntent
     data object Refresh : TaskDetailIntent
     data object LoadMoreExecutions : TaskDetailIntent
     data object ToggleDebugHistory : TaskDetailIntent
@@ -75,7 +76,8 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             is TaskDetailIntent.CloseReasonChanged -> if (!uiState.value.closeSending) mutableState.update { it.copy(closeDialog = it.closeDialog?.copy(reason = intent.value), closeError = null) }
             TaskDetailIntent.DismissClose -> if (!uiState.value.closeSending) mutableState.update { it.copy(closeDialog = null, closeError = null) }
             TaskDetailIntent.ConfirmClose -> confirmClose()
-            TaskDetailIntent.Refresh -> if (uiState.value.canRefresh) refresh(manual = true)
+            TaskDetailIntent.Refresh -> if (uiState.value.canRefresh) refresh()
+            TaskDetailIntent.PullRefresh -> if (uiState.value.canRefresh) refresh(manual = true)
             TaskDetailIntent.LoadMoreExecutions -> executions(reset = false)
             TaskDetailIntent.ToggleDebugHistory -> toggleDebugHistory()
             TaskDetailIntent.LoadMoreHistory -> history(reset = false)

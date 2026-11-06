@@ -31,17 +31,16 @@ fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingInt
     val keyboard = LocalSoftwareKeyboardController.current
     val task = state.task
     val output = task?.lines?.filter { it.role == "output" }?.singleOrNull()
-    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(ManufacturingIntent.Refresh) }) {
+    RefreshableContent(state.refreshing, state.canRefresh, { onIntent(ManufacturingIntent.PullRefresh) }, automaticLoading = state.loading || state.previewLoading || state.catalogLoading || state.materialSelecting || state.materials.any { it.loading } || state.result == ExecutionResultState.Sending) {
         LazyColumn(Modifier.fillMaxSize().testTag("manufacturing-list").padding(horizontal = 16.dp), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Text("Изготовление", style = MaterialTheme.typography.headlineMedium)
-                if (state.loading && !state.refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
                 state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
                 when (val result = state.result) {
                     is ExecutionResultState.Confirmed -> { Text("Готово", color = MaterialTheme.colorScheme.primary) }
                     is ExecutionResultState.Unresolved -> { Text("Исход неизвестен: ${result.error.operationalMessage()}", color = MaterialTheme.colorScheme.error) }
                     is ExecutionResultState.Rejected -> Text(result.error.operationalMessage(), color = MaterialTheme.colorScheme.error)
-                    ExecutionResultState.Sending -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    ExecutionResultState.Sending -> Unit
                     else -> Unit
                 }
                 state.pending?.let { pending -> Text("Не подтверждено: ${pending.summary.operationalTitle()}"); pending.summary.operationalLines().forEach { Text(it) } }
@@ -60,24 +59,29 @@ fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingInt
             }
             if (state.prototype) {
                 item {
-                    Text("Материалы первого выпуска", style = MaterialTheme.typography.titleLarge)
-                    Text("Добавьте потраченные материалы")
+                    Text("Материалы, затраченные на прототип:", style = MaterialTheme.typography.titleLarge)
                     OutlinedTextField(value = state.catalogQuery, onValueChange = { onIntent(ManufacturingIntent.CatalogQueryChanged(it)) }, label = { Text("Поиск материала") }, enabled = state.editable, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextButton(onClick = { onIntent(ManufacturingIntent.SearchCatalog) }, enabled = state.editable && !state.catalogLoading) { Text("Найти материалы") }
-                    if (state.catalogLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                     state.catalogError?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
                 }
-                items(state.catalog, key = { "catalog-${it.id}" }) { product ->
-                    OutlinedButton(onClick = { onIntent(ManufacturingIntent.AddMaterial(product)) }, modifier = Modifier.testTag("prototype-add-${product.id}"), enabled = state.editable) { Text("Добавить ${product.name}") }
+                items(state.catalog, key = { "catalog-${it.productId}" }) { product ->
+                    val dimensions = product.dimensions.filter { it.sheets > 0 && it.length.signum() > 0 }
+                    if (dimensions.isEmpty()) {
+                        OutlinedButton(onClick = { onIntent(ManufacturingIntent.AddMaterial(product.productId)) }, modifier = Modifier.testTag("prototype-add-${product.productId}"), enabled = state.editable && !state.materialSelecting) {
+                            Text("Добавить ${product.productName ?: "материал"}: ${QuantityFormatter.format(product.quantity)} ${product.baseUnit}")
+                        }
+                    } else dimensions.forEach { dimension ->
+                        OutlinedButton(onClick = { onIntent(ManufacturingIntent.AddMaterial(product.productId, dimension.length)) }, modifier = Modifier.testTag("prototype-add-${product.productId}-${dimension.length.toPlainString()}"), enabled = state.editable && !state.materialSelecting) {
+                            Text("${product.productName ?: "Материал"} · ${QuantityFormatter.format(dimension.length)} м · ${dimension.sheets} листов")
+                        }
+                    }
                 }
-                if (state.catalogMore) item { TextButton(onClick = { onIntent(ManufacturingIntent.MoreCatalog) }, enabled = state.editable && !state.catalogLoading) { Text("Ещё товары каталога") } }
+                if (state.catalogMore) item { TextButton(onClick = { onIntent(ManufacturingIntent.MoreCatalog) }, enabled = state.editable && !state.catalogLoading) { Text("Ещё материалы") } }
                 items(state.materials, key = PrototypeMaterialRow::id) { row ->
                     PrototypeMaterialEditor(row, state.editable, { field, value -> onIntent(ManufacturingIntent.MaterialChanged(row.id, field, value)) }, { onIntent(ManufacturingIntent.RemoveMaterial(row.id)) })
                 }
             }
             item {
-                Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ManufacturingIntent.PreviewClick) }, modifier = Modifier.fillMaxWidth().testTag("manufacturing-preview"), enabled = state.editable && !state.previewLoading) { Text(if (state.previewLoading) "Рассчитываем…" else "Рассчитать расход") }
-                if (state.previewLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                Button(onClick = { focus.clearFocus(); keyboard?.hide(); onIntent(ManufacturingIntent.PreviewClick) }, modifier = Modifier.fillMaxWidth().testTag("manufacturing-preview"), enabled = state.editable && !state.previewLoading && !state.materialSelecting && state.materials.none { it.loading || it.error != null }) { Text(if (state.previewLoading) "Рассчитываем…" else "Рассчитать расход") }
             }
             state.binding?.preview?.let { preview ->
                 item { ManufacturingPreviewSummary(preview) }
@@ -99,13 +103,12 @@ fun ManufacturingScreen(state: ManufacturingUiState, onIntent: (ManufacturingInt
 private fun PrototypeMaterialEditor(row: PrototypeMaterialRow, enabled: Boolean, onChange: (PrototypeMaterialField, String) -> Unit, onRemove: () -> Unit) {
     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(row.product.name, style = MaterialTheme.typography.titleMedium)
-        if (row.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         row.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error) }
         row.definition?.fullWidth?.let { Text("Ширина ${QuantityFormatter.format(it)} м") }
         if (!row.product.sheet) OutlinedTextField(value = row.input.quantity, onValueChange = { onChange(PrototypeMaterialField.QUANTITY, it) }, label = { Text("Потрачено, ${row.product.baseUnit}") }, enabled = enabled, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("prototype-material-qty-${row.id}"))
         if (row.product.sheet) {
+            Text("Длина листа ${row.input.sheetLength.toBigDecimalOrNull()?.let(QuantityFormatter::format) ?: "—"} м")
             OutlinedTextField(value = row.input.sheets, onValueChange = { onChange(PrototypeMaterialField.SHEETS, it) }, label = { Text("Потрачено листов") }, enabled = enabled, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = row.input.sheetLength, onValueChange = { onChange(PrototypeMaterialField.LENGTH, it) }, label = { Text("Длина листа, м") }, enabled = enabled, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
         }
         TextButton(onClick = onRemove, enabled = enabled) { Text("Убрать") }
     } }

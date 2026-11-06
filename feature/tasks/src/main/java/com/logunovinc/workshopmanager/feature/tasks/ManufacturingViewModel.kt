@@ -10,6 +10,8 @@ import com.logunovinc.workshopmanager.domain.pending.*
 import com.logunovinc.workshopmanager.domain.stock.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import java.math.BigDecimal
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -21,7 +23,7 @@ data class ManufacturingUiState(val loading: Boolean = true, val refreshing: Boo
     val output: ActualLineInput? = null, val materials: List<PrototypeMaterialRow> = emptyList(),
     val previewLoading: Boolean = false, val binding: ManufacturingPreviewBinding? = null, val reviewOpen: Boolean = false,
     val result: ExecutionResultState = ExecutionResultState.Idle, val pending: PendingCommand? = null, val error: AppError? = null,
-    val catalogQuery: String = "", val catalog: List<Product> = emptyList(), val catalogLoading: Boolean = false,
+    val materialSelecting: Boolean = false, val catalogQuery: String = "", val catalog: List<StockPosition> = emptyList(), val catalogLoading: Boolean = false,
     val catalogOffset: Long = 0, val catalogMore: Boolean = false, val catalogError: AppError? = null,
 ) {
     val prototype: Boolean get() = task?.production?.status == RecipeStatus.AWAITING_PROTOTYPE
@@ -29,27 +31,27 @@ data class ManufacturingUiState(val loading: Boolean = true, val refreshing: Boo
     val editable: Boolean get() = !loading && !stale && task?.type == TaskType.MANUFACTURE_PRODUCT && task.canExecute &&
         result != ExecutionResultState.Sending && result !is ExecutionResultState.Unresolved && pending == null && !reviewOpen
 }
-enum class PrototypeMaterialField { QUANTITY, SHEETS, LENGTH, UNIT_NAME, UNIT_QUANTITY }
+enum class PrototypeMaterialField { QUANTITY, SHEETS, UNIT_NAME, UNIT_QUANTITY }
 sealed interface ManufacturingIntent {
     data class OutputQuantityChanged(val value: String) : ManufacturingIntent
     data class OutputSheetsChanged(val value: String) : ManufacturingIntent
     data class MaterialChanged(val rowId: Long, val field: PrototypeMaterialField, val value: String) : ManufacturingIntent
-    data class AddMaterial(val product: Product) : ManufacturingIntent
+    data class AddMaterial(val productId: Long, val sheetLength: BigDecimal? = null) : ManufacturingIntent
     data class RemoveMaterial(val rowId: Long) : ManufacturingIntent
     data class CatalogQueryChanged(val value: String) : ManufacturingIntent
-    data object SearchCatalog : ManufacturingIntent
     data object MoreCatalog : ManufacturingIntent
     data object PreviewClick : ManufacturingIntent
     data object ReviewClick : ManufacturingIntent
     data object DismissReview : ManufacturingIntent
     data object ConfirmClick : ManufacturingIntent
+    data object PullRefresh : ManufacturingIntent
     data object Refresh : ManufacturingIntent
 }
 @HiltViewModel
 class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHandle,
     private val loadTask: LoadTaskUseCase, private val prepare: PrepareManufacturingUseCase,
     private val preview: PreviewManufacturingUseCase, private val execute: ExecuteManufacturingUseCase,
-    private val searchProducts: SearchProductsUseCase, private val loadDefinition: LoadStockDefinitionUseCase,
+    private val loadStock: LoadStockUseCase, private val loadProduct: LoadProductUseCase, private val loadDefinition: LoadStockDefinitionUseCase,
     pending: PendingCommandRepository,
 ) : ViewModel() {
     private val taskId: Long = checkNotNull(savedStateHandle["taskId"])
@@ -87,24 +89,23 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
                 mutableState.update { it.copy(materials = it.materials.map { row -> if (row.id != intent.rowId) row else row.copy(input = when (intent.field) {
                     PrototypeMaterialField.QUANTITY -> row.input.copy(quantity = intent.value)
                     PrototypeMaterialField.SHEETS -> row.input.copy(sheets = intent.value)
-                    PrototypeMaterialField.LENGTH -> row.input.copy(sheetLength = intent.value)
                     PrototypeMaterialField.UNIT_NAME -> row.input.copy(unitName = intent.value)
                     PrototypeMaterialField.UNIT_QUANTITY -> row.input.copy(unitQuantity = intent.value)
                 }) }) }
             }
-            is ManufacturingIntent.AddMaterial -> if (current.editable && current.prototype) addMaterial(intent.product)
+            is ManufacturingIntent.AddMaterial -> if (current.editable && current.prototype) selectMaterial(intent.productId, intent.sheetLength)
             is ManufacturingIntent.RemoveMaterial -> if (current.editable && current.prototype) { invalidatePreview(); mutableState.update { it.copy(materials = it.materials.filterNot { row -> row.id == intent.rowId }) } }
             is ManufacturingIntent.CatalogQueryChanged -> if (current.editable && current.prototype) {
-                catalogGeneration++; catalogJob?.cancel()
-                mutableState.update { it.copy(catalogQuery = intent.value, catalog = emptyList(), catalogLoading = false, catalogMore = false, catalogOffset = 0) }
+                mutableState.update { it.copy(catalogQuery = intent.value, catalog = emptyList(), catalogMore = false, catalogOffset = 0) }
+                catalog(reset = true, debounce = true)
             }
-            ManufacturingIntent.SearchCatalog -> if (current.editable && current.prototype) catalog(reset = true)
             ManufacturingIntent.MoreCatalog -> if (current.editable && current.prototype) catalog(reset = false)
             ManufacturingIntent.PreviewClick -> requestPreview()
             ManufacturingIntent.ReviewClick -> if (current.editable && current.binding?.revision == revision && current.binding.preview.canExecute) mutableState.update { it.copy(reviewOpen = true) }
             ManufacturingIntent.DismissReview -> if (current.result != ExecutionResultState.Sending) mutableState.update { it.copy(reviewOpen = false) }
             ManufacturingIntent.ConfirmClick -> confirm()
-            ManufacturingIntent.Refresh -> if (current.canRefresh) refresh(reset = false, manual = true)
+            ManufacturingIntent.Refresh -> if (current.canRefresh) refresh(reset = false)
+            ManufacturingIntent.PullRefresh -> if (current.canRefresh) refresh(reset = false, manual = true)
         }
     }
     private fun draft(state: ManufacturingUiState): ManufacturingDraft? = state.output?.let { ManufacturingDraft(it, if (state.prototype) state.materials.map(PrototypeMaterialRow::input) else emptyList()) }
@@ -112,7 +113,7 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
         val current = uiState.value
         val task = current.task ?: return
         val draft = draft(current) ?: return
-        if (!current.editable || current.previewLoading) return
+        if (!current.editable || current.previewLoading || current.materialSelecting || current.materials.any { it.loading || it.error != null }) return
         val command = when (val prepared = prepare(task, draft)) {
             is Outcome.Failure -> { mutableState.update { it.copy(error = prepared.error) }; return }
             is Outcome.Success -> prepared.value
@@ -154,20 +155,49 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
         viewModelScope.launch {
             when (val task = loadTask(taskId)) {
                 is Outcome.Failure -> if (generation == loadGeneration) mutableState.update { it.copy(loading = false, refreshing = false, error = task.error) }
-                is Outcome.Success -> if (generation == loadGeneration) mutableState.update { state ->
+                is Outcome.Success -> if (generation == loadGeneration) {
+                    mutableState.update { state ->
                     val output = task.value.lines.filter { it.role == "output" }.singleOrNull()
                     val prototype = task.value.production?.status == RecipeStatus.AWAITING_PROTOTYPE
                     state.copy(loading = false, refreshing = false, stale = false, task = task.value,
                         output = output?.let { line -> if (!reset && state.output?.taskLineId == line.id) state.output else ActualLineInput(line.id) },
                         materials = if (reset || !prototype) emptyList() else state.materials)
+                    }
+                    if (uiState.value.prototype && uiState.value.editable) catalog(reset = true)
                 }
             }
         }
     }
-    private fun addMaterial(product: Product) {
+    private fun selectMaterial(productId: Long, requestedLength: BigDecimal?) {
+        if (uiState.value.materialSelecting || uiState.value.catalog.none { it.productId == productId }) return
+        val position = uiState.value.catalog.first { it.productId == productId }
+        val lengths = position.dimensions.filter { it.sheets > 0 && it.length.signum() > 0 }.map { it.length }
+        val selectedLength = requestedLength ?: lengths.singleOrNull()
+        if (requestedLength != null && lengths.none { it.compareTo(requestedLength) == 0 }) return
+        invalidatePreview()
+        val generation = catalogGeneration
+        mutableState.update { it.copy(materialSelecting = true, catalogError = null) }
+        viewModelScope.launch {
+            when (val result = loadProduct(productId)) {
+                is Outcome.Success -> if (generation == catalogGeneration && uiState.value.editable && uiState.value.prototype) {
+                    if (result.value.sheet && selectedLength == null) {
+                        mutableState.update { it.copy(catalogError = AppError(ErrorKind.VALIDATION, "Нет остатка с известной длиной листа")) }
+                    } else {
+                        addMaterial(result.value, if (result.value.sheet) selectedLength else null)
+                        catalogGeneration++
+                        catalogJob?.cancel()
+                        mutableState.update { it.copy(catalog = emptyList(), catalogMore = false, catalogLoading = false, catalogOffset = 0) }
+                    }
+                }
+                is Outcome.Failure -> if (generation == catalogGeneration) mutableState.update { it.copy(catalogError = result.error) }
+            }
+            mutableState.update { it.copy(materialSelecting = false) }
+        }
+    }
+    private fun addMaterial(product: Product, sheetLength: BigDecimal?) {
         invalidatePreview()
         val id = ++rowSequence
-        mutableState.update { it.copy(materials = it.materials + PrototypeMaterialRow(id, product, PrototypeMaterialInput(product.id))) }
+        mutableState.update { it.copy(materials = it.materials + PrototypeMaterialRow(id, product, PrototypeMaterialInput(product.id, sheetLength = sheetLength?.toPlainString().orEmpty()))) }
         viewModelScope.launch {
             when (val result = loadDefinition(product.id)) {
                 is Outcome.Success -> mutableState.update { it.copy(materials = it.materials.map { row -> if (row.id == id) row.copy(definition = result.value, loading = false) else row }) }
@@ -175,18 +205,39 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
             }
         }
     }
-    private fun catalog(reset: Boolean) {
+    private fun catalog(reset: Boolean, debounce: Boolean = false) {
         val state = uiState.value
+        if (state.catalogQuery.isBlank()) {
+            catalogGeneration++
+            catalogJob?.cancel()
+            mutableState.update { it.copy(catalog = emptyList(), catalogLoading = false, catalogMore = false, catalogOffset = 0, catalogError = null) }
+            return
+        }
         if (!reset && (state.catalogLoading || !state.catalogMore)) return
         if (reset) { catalogGeneration++; catalogJob?.cancel() }
         val generation = catalogGeneration
+        val warehouseId = state.task?.warehouseId ?: return
         val query = state.catalogQuery
         mutableState.update { it.copy(catalogLoading = true, catalogError = null, catalog = if (reset) emptyList() else it.catalog) }
         catalogJob = viewModelScope.launch {
-            when (val page = searchProducts(query, if (reset) 0 else state.catalogOffset)) {
-                is Outcome.Failure -> if (generation == catalogGeneration) mutableState.update { it.copy(catalogLoading = false, catalogError = page.error) }
-                is Outcome.Success -> if (generation == catalogGeneration) mutableState.update { it.copy(catalogLoading = false,
-                    catalog = ((if (reset) emptyList() else it.catalog) + page.value.items).distinctBy(Product::id), catalogOffset = page.value.nextOffset, catalogMore = page.value.hasMore) }
+            if (debounce) delay(300)
+            var offset = if (reset) 0L else state.catalogOffset
+            while (generation == catalogGeneration) {
+                when (val page = loadStock(warehouseId, StockFilter(query, onlyAvailable = false), offset)) {
+                    is Outcome.Failure -> {
+                        if (generation == catalogGeneration) mutableState.update { it.copy(catalogLoading = false, catalogError = page.error) }
+                        return@launch
+                    }
+                    is Outcome.Success -> {
+                        if (generation != catalogGeneration) return@launch
+                        val present = page.value.items.filter { position -> position.quantity.signum() > 0 || position.dimensions.any { it.sheets > 0 } }
+                        val more = page.value.hasMore && page.value.nextOffset > offset
+                        mutableState.update { it.copy(catalogLoading = present.isEmpty() && more,
+                            catalog = (it.catalog + present).distinctBy(StockPosition::productId), catalogOffset = page.value.nextOffset, catalogMore = more) }
+                        if (present.isNotEmpty() || !more) return@launch
+                        offset = page.value.nextOffset
+                    }
+                }
             }
         }
     }

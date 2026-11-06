@@ -61,7 +61,7 @@ class AuthViewModelTest {
         assertEquals("", vm.uiState.value.login)
         assertEquals("", vm.uiState.value.password)
     }
-    @Test fun loginAndLogoutClearPasswordWithoutReapplyingPrefill() = runTest(dispatcher) {
+    @Test fun loginClearsPasswordAndLogoutShowsConfiguredDefaults() = runTest(dispatcher) {
         val repository = Repository("http://localhost:8000/")
         val prefill = AuthPrefill("fixture-local-user", "fixture-local-password")
         val vm = viewModel(repository, prefill)
@@ -72,7 +72,8 @@ class AuthViewModelTest {
         assertEquals("", vm.uiState.value.password)
         vm.onIntent(AuthIntent.LogoutClick)
         runCurrent()
-        assertEquals("", vm.uiState.value.password)
+        assertEquals("fixture-local-password", vm.uiState.value.password)
+        assertEquals("fixture-local-user", vm.uiState.value.login)
         assertFalse(prefill.toString().contains("fixture-local-password"))
     }
     @Test fun duplicateLoginTapHasOneRequestAndPasswordClears() = runTest(dispatcher) {

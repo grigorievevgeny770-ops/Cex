@@ -49,7 +49,7 @@ class StockViewModelsTest {
         assertEquals(listOf(2L), vm.uiState.value.items.map(StockPosition::productId))
         assertEquals("new", repository.lastFilter?.query)
     }
-    @Test fun pagingBeyondFiftyAndAvailableToggleReachServer() = runTest(dispatcher) {
+    @Test fun pagingBeyondFiftyAlwaysIncludesUnavailableStock() = runTest(dispatcher) {
         val repository = Stock()
         repository.listing = { _, offset -> Outcome.Success(Page((offset until minOf(offset + 50, 55)).map { Stock.position(it + 1) }, 55, 50, offset)) }
         val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository))
@@ -60,9 +60,7 @@ class StockViewModelsTest {
         assertEquals(55, vm.uiState.value.items.size)
         assertEquals(2, repository.calls)
         assertFalse(vm.uiState.value.hasMore)
-        vm.onIntent(StockListIntent.OnlyAvailableChanged(true)); runCurrent()
-        assertTrue(repository.lastFilter!!.onlyAvailable)
-        assertEquals(50, vm.uiState.value.items.size)
+        assertFalse(repository.lastFilter!!.onlyAvailable)
     }
     @Test fun revokedWorkshopClearsCachedRowsAndShowsPermissionError() = runTest(dispatcher) {
         val warehouse = Warehouses()

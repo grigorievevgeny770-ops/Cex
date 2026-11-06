@@ -46,6 +46,8 @@ class AuthViewModel @Inject constructor(
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = mutableState.asStateFlow()
+    private var startupPrefill = true
+    private var credentialsEdited = false
     init {
         viewModelScope.launch { repository.session.collect { session ->
             mutableState.update { it.copy(restoring = session.restoring, actor = session.actor,
@@ -56,17 +58,19 @@ class AuthViewModel @Inject constructor(
                 val changed = it.environment.isNotBlank() && it.environment != url
                 it.copy(environment = url, environmentInput = url, serverOption = ServerOption.forUrl(url), login = if (changed) "" else it.login, password = if (changed) "" else it.password)
             }
+            if (startupPrefill && !credentialsEdited) applyPrefill()
         } }
-        perform(prefillAfterRestore = true) { restore() }
+        perform(clearPassword = false) { restore() }
     }
     fun onIntent(intent: AuthIntent) {
         when (intent) {
-            is AuthIntent.LoginChanged -> mutableState.update { it.copy(login = intent.value, error = null) }
-            is AuthIntent.PasswordChanged -> mutableState.update { it.copy(password = intent.value, error = null) }
+            is AuthIntent.LoginChanged -> { credentialsEdited = true; mutableState.update { it.copy(login = intent.value, error = null) } }
+            is AuthIntent.PasswordChanged -> { credentialsEdited = true; mutableState.update { it.copy(password = intent.value, error = null) } }
             is AuthIntent.EnvironmentChanged -> if (!uiState.value.busy && !uiState.value.restoring) mutableState.update { it.copy(environmentInput = intent.value, serverOption = ServerOption.CUSTOM, error = null) }
             is AuthIntent.ServerSelected -> {
                 val state = uiState.value
                 if (state.busy || state.restoring) return
+                startupPrefill = false
                 if (intent.option == ServerOption.CUSTOM) mutableState.update { it.copy(serverOption = intent.option, login = "", password = "", error = null) }
                 else {
                     val url = checkNotNull(intent.option.baseUrl)
@@ -85,9 +89,10 @@ class AuthViewModel @Inject constructor(
                 }
                 perform { login(current.login, current.password) }
             }
-            AuthIntent.LogoutClick -> perform { logout() }
+            AuthIntent.LogoutClick -> perform(prefillAfterLogout = true) { logout() }
             AuthIntent.ApplyEnvironment -> {
                 val url = uiState.value.environmentInput
+                startupPrefill = false
                 perform {
                     val result = changeEnvironment(url)
                     if (result is Outcome.Success) mutableState.update { it.copy(serverOption = ServerOption.forUrl(repository.environment.value), environmentInput = repository.environment.value) }
@@ -97,26 +102,30 @@ class AuthViewModel @Inject constructor(
             AuthIntent.RetryRestore -> perform { restore() }
         }
     }
-    private fun perform(prefillAfterRestore: Boolean = false, operation: suspend () -> Outcome<*>) {
+    private fun applyPrefill() {
+        val state = uiState.value
+        if (state.actor == null && state.login.isBlank() && state.password.isBlank()) {
+            prefill.applyIfEligible(state.environment) { login, password ->
+                mutableState.update { it.copy(login = login, password = password) }
+            }
+        }
+    }
+    private fun perform(clearPassword: Boolean = true, prefillAfterLogout: Boolean = false, operation: suspend () -> Outcome<*>) {
         if (uiState.value.busy) return
         mutableState.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
-            var applyLocalPrefill = false
             try {
                 when (val result = operation()) {
-                    is Outcome.Failure -> {
-                        applyLocalPrefill = prefillAfterRestore
-                        mutableState.update { it.copy(error = result.error.message) }
-                    }
+                    is Outcome.Failure -> mutableState.update { it.copy(error = result.error.message) }
                     is Outcome.Success -> Unit
                 }
             } finally {
-                mutableState.update { it.copy(busy = false, restoring = false, password = "") }
-                val state = uiState.value
-                if (applyLocalPrefill && state.actor == null && state.login.isBlank() && state.password.isBlank()) {
-                    prefill.applyIfEligible(state.environment) { login, password ->
-                        mutableState.update { it.copy(login = login, password = password) }
-                    }
+                mutableState.update { it.copy(busy = false, restoring = false, password = if (clearPassword) "" else it.password) }
+                if (!clearPassword) startupPrefill = false
+                if (prefillAfterLogout) {
+                    credentialsEdited = false
+                    mutableState.update { it.copy(login = "", password = "") }
+                    applyPrefill()
                 }
             }
         }

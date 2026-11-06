@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class StockDetailUiState(val loading: Boolean = true, val refreshing: Boolean = false, val position: StockPosition? = null, val warehouse: Warehouse? = null, val error: AppError? = null)
-sealed interface StockDetailIntent { data object Refresh : StockDetailIntent }
+sealed interface StockDetailIntent { data object Refresh : StockDetailIntent; data object PullRefresh : StockDetailIntent }
 @HiltViewModel
 class StockDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle,
     private val resolve: ResolveWorkshopUseCase, private val load: LoadStockPositionUseCase) : ViewModel() {
@@ -21,7 +21,7 @@ class StockDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandl
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
     init { refresh() }
-    fun onIntent(intent: StockDetailIntent) { when (intent) { StockDetailIntent.Refresh -> if (!uiState.value.loading) refresh(manual = true) } }
+    fun onIntent(intent: StockDetailIntent) { when (intent) { StockDetailIntent.Refresh -> if (!uiState.value.loading) refresh(); StockDetailIntent.PullRefresh -> if (!uiState.value.loading) refresh(manual = true) } }
     private fun refresh(manual: Boolean = false) {
         val request = ++generation
         mutableState.update { it.copy(loading = true, refreshing = manual, error = null) }

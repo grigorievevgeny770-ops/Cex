@@ -18,8 +18,9 @@ import com.logunovinc.workshopmanager.domain.auth.Actor
 fun AuthRoute(viewModel: AuthViewModel, authenticatedContent: @Composable (Actor, () -> Unit) -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val actor = state.actor
-    if (actor != null) authenticatedContent(actor) { viewModel.onIntent(AuthIntent.LogoutClick) }
-    else AuthScreen(state, viewModel::onIntent)
+    if (actor != null) key(state.environment, actor.id) {
+        authenticatedContent(actor) { viewModel.onIntent(AuthIntent.LogoutClick) }
+    } else AuthScreen(state, viewModel::onIntent)
 }
 
 @Composable

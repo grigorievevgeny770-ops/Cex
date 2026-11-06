@@ -76,4 +76,20 @@ class CloseIncompleteConnectedSmokeTest {
         confirmed();assertEquals(reads+1,backend.backend.taskListReads.get())
     }
 
+    @Test fun physicalTouchAfterCompletedReturnAndOnArchivedCardOpensEachTask() {
+        backend.backend.additionalTask=true
+        openTask();dialog();reason("Причина UI");compose.onNodeWithTag("close-incomplete-confirm").performClick()
+        confirmed()
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-card-102").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-card-102").performScrollTo().performTouchInput { click() }
+        waitText("Другой товар");compose.onNodeWithTag("task-detail-list").assertIsDisplayed()
+        compose.onNodeWithText("Назад",substring=false).performTouchInput { click() }
+        compose.onNodeWithText("История заданий").performTouchInput { click() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithTag("task-card-101").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-card-101").performScrollTo().performTouchInput { click() }
+        waitText("Причина: Причина UI");compose.onNodeWithTag("task-detail-list").assertIsDisplayed()
+        compose.waitForIdle();compose.onNodeWithTag("task-detail-list").assertIsDisplayed()
+        assertEquals(1,backend.backend.closes.get())
+    }
+
 }

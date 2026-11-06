@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -37,7 +36,13 @@ fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, con
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, onTaskClick: (Long) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    RefreshableContent(
+        refreshing = state.pullRefreshing,
+        enabled = !state.loading && !state.refreshing && !state.loadingMore,
+        onRefresh = { onIntent(TaskListIntent.PullRefresh) },
+        automaticLoading = state.loading || state.refreshing || state.loadingMore,
+    ) {
+    Column(Modifier.fillMaxSize().padding(start = 16.dp, top = 12.dp, end = 16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Задания", style = MaterialTheme.typography.headlineMedium)
         }
@@ -55,10 +60,8 @@ fun TaskListScreen(state: TaskListUiState, onIntent: (TaskListIntent) -> Unit, o
                 }
             }
         }
-        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { Text(it.operationalMessage(), color = MaterialTheme.colorScheme.error); TextButton(onClick = { onIntent(TaskListIntent.Refresh) }) { Text("Повторить загрузку") } }
-        PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = { onIntent(TaskListIntent.Refresh) }, modifier = Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize().testTag("task-list"), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
+            LazyColumn(Modifier.weight(1f).fillMaxSize().testTag("task-list"), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
                 if (!state.loading && state.error == null && state.items.isEmpty()) item { Text("Доступных заданий пока нет. Потяните вниз для обновления") }
                 items(state.items, key = Task::id) { task ->
                     val displayedLines = task.lines.filter { task.type != TaskType.MANUFACTURE_PRODUCT || it.role == "output" }
