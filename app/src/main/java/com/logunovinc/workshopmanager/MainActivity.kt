@@ -67,7 +67,10 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
     }) { padding ->
         NavHost(navController, startDestination = "tasks-stack", modifier = Modifier.padding(padding)) {
             navigation(startDestination = "tasks", route = "tasks-stack") {
-                composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, consumeCompletion = { entry.savedStateHandle.remove<String>("completedCommandId") }) }
+                composable("tasks") { entry -> TaskListRoute(hiltViewModel(entry), { navController.navigate("task/$it") }, { navController.navigate("order/$it") }, consumeCompletion = { entry.savedStateHandle.remove<String>("completedCommandId") }) }
+                composable("order/{orderId}", arguments = listOf(navArgument("orderId") { type = NavType.LongType })) { entry ->
+                    OrderDetailRoute(hiltViewModel(entry), onCompleted = completed)
+                }
                 composable("task/{taskId}", arguments = listOf(navArgument("taskId") { type = NavType.LongType })) { entry ->
                     TaskDetailRoute(hiltViewModel(entry), { navController.navigate("receive/$it") }, { navController.navigate("dispatch/$it") }, { navController.navigate("manufacturing/$it") }, { navController.navigate("receive/$it?final=true") }, onCompleted = completed)
                 }
@@ -91,7 +94,8 @@ private fun WorkshopNavigation(onLogout: () -> Unit) {
                 }
             }
             navigation(startDestination = "stock", route = "stock-stack") {
-                composable("stock") { entry -> StockListRoute(hiltViewModel(entry)) { navController.navigate("stock-item/$it") } }
+                composable("stock") { entry -> StockListRoute(hiltViewModel(entry), { navController.navigate("stock-item/$it") }, { navController.navigate("sheets") }) }
+                composable("sheets") { entry -> SheetRequestRoute(hiltViewModel(entry)) }
                 composable("stock-item/{productId}", arguments = listOf(navArgument("productId") { type = NavType.LongType })) { entry -> StockDetailRoute(hiltViewModel(entry)) }
             }
         }

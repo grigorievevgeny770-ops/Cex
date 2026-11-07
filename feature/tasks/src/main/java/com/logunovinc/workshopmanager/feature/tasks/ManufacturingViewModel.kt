@@ -68,7 +68,7 @@ class ManufacturingViewModel @Inject constructor(savedStateHandle: SavedStateHan
             val current = uiState.value
             val unresolvedId = (current.result as? ExecutionResultState.Unresolved)?.command?.id ?: current.pending?.id
             val recovered = commands.firstOrNull { it.id == unresolvedId && it.state == PendingState.ACKNOWLEDGED }?.confirmation
-            val blocked = commands.firstOrNull { it.taskId == taskId && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
+            val blocked = commands.firstOrNull { it.taskId == taskId && !it.action.startsWith("REQUEST_") && !it.action.startsWith("SHEET_") && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
             mutableState.update { it.copy(pending = blocked, result = recovered?.let(ExecutionResultState::Confirmed) ?: it.result) }
             if (recovered != null) refresh(reset = true)
         } }

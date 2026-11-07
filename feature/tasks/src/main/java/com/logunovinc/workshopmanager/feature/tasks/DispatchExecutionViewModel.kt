@@ -41,7 +41,7 @@ class DispatchExecutionViewModel @Inject constructor(savedStateHandle: SavedStat
     private var generation = 0L
     init {
         viewModelScope.launch { pending.observe().collect { commands ->
-            val blocked = commands.firstOrNull { it.taskId == taskId && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
+            val blocked = commands.firstOrNull { it.taskId == taskId && !it.action.startsWith("REQUEST_") && !it.action.startsWith("SHEET_") && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
             val unresolvedId = (uiState.value.result as? ExecutionResultState.Unresolved)?.command?.id ?: uiState.value.pending?.id
             val recovered = commands.firstOrNull { it.id == unresolvedId && it.state == PendingState.ACKNOWLEDGED }?.confirmation
             mutableState.update { it.copy(pending = blocked, result = recovered?.let(ExecutionResultState::Confirmed) ?: it.result) }

@@ -45,6 +45,37 @@ class CommandDispatcherTest {
         session = FakeSession()
     }
     @After fun after() { database.close() }
+    @Test fun overlappingIdsHaveSeparateDurableSlotsAndUnknownRequestRetriesExactBytes() = runBlocking {
+        val bodies = mutableListOf<ByteArray>()
+        val d = dispatcher(sender { command ->
+            bodies.add(command.body.copyOf())
+            throw IOException("lost response")
+        })
+        val task = submit(d) as CommandOutcome.Unresolved
+        val request = d.submit(101, "REQUEST_START", "POST", "api/workshop/requests/101/start", summary) { token ->
+            """{"expected_version":1,"client_token":"$token"}""".toByteArray()
+        } as CommandOutcome.Unresolved
+        assertNotEquals(task.command.id, request.command.id)
+        assertEquals("task", room.get(task.command.id)!!.scope)
+        assertEquals("request", room.get(request.command.id)!!.scope)
+        d.retry(request.command.id)
+        assertArrayEquals(bodies[1], bodies[2])
+        assertNotNull(database.commands().active("https://example.com/", 42, 101, "request"))
+        assertNotNull(database.commands().active("https://example.com/", 42, 101, "task"))
+    }
+    @Test fun acknowledgedSheetRequestAllowsANewDeliveryButUnknownDoesNot() = runBlocking {
+        var sends = 0
+        val d = dispatcher(sender { command ->
+            sends++
+            RawCommandResponse(200, "application/json", """{"result":{"id":$sends,"duplicate":false},"request":{"id":$sends,"version":1,"status":"requested"}}""")
+        })
+        suspend fun create() = d.submit(101, "SHEET_REQUEST", "POST", "api/workshop/sheet-requests", summary) { token ->
+            """{"warehouse_id":42,"product_id":101,"sheets":2,"sheet_length_m":"2","client_token":"$token"}""".toByteArray()
+        }
+        assertTrue(create() is CommandOutcome.Confirmed)
+        assertTrue(create() is CommandOutcome.Confirmed)
+        assertEquals(2, sends)
+    }
     private fun dispatcher(sender: RawCommandSender, journal: CommandJournal = room, registry: CommandMutexRegistry = CommandMutexRegistry.process) =
         CommandDispatcher(journal, sender, session, json, errors, mapper, registry)
     private suspend fun submit(dispatcher: CommandDispatcher) = dispatcher.submit(101, "DISPATCH_GOODS", "POST", "api/workshop/tasks/101/executions", summary) { token ->

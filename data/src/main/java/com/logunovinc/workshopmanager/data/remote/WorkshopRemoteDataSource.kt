@@ -2,6 +2,7 @@ package com.logunovinc.workshopmanager.data.remote
 
 import com.logunovinc.workshopmanager.domain.*
 import com.logunovinc.workshopmanager.data.remote.dto.*
+import com.logunovinc.workshopmanager.domain.order.WorkshopContracts
 import com.logunovinc.workshopmanager.domain.task.TaskFilter
 import retrofit2.Response
 import kotlinx.coroutines.sync.Mutex
@@ -23,6 +24,32 @@ class WorkshopRemoteDataSource(private val factory: ApiFactory, private val curr
             }
         }
     }
+    private val contractCache = mutableMapOf<String, Pair<WorkshopContracts, Long>>()
+    suspend fun workshopContracts(): Outcome<WorkshopContracts> = capabilityLock.withLock {
+        val profile = current.snapshot() ?: return@withLock Outcome.Failure(AppError(ErrorKind.AUTHENTICATION, "Требуется вход"))
+        contractCache[profile.baseUrl]?.takeIf { it.first.orders && System.nanoTime() - it.second < 300_000_000_000L }?.let { return@withLock Outcome.Success(it.first) }
+        when (val result = calls.request(WorkshopApi::class.java, missingRoute = true, publicRead = true) { api, _ -> api.capabilities() }) {
+            is Outcome.Failure -> result
+            is Outcome.Success -> {
+                val paths = result.value.paths.keys
+                val contracts = WorkshopContracts(
+                    orders = "/api/workshop/requests" in paths,
+                    stockSummary = "/api/workshop/stock-summary" in paths,
+                    sheetRequests = "/api/workshop/sheet-requests" in paths,
+                )
+                if (!current.matches(profile)) Outcome.Failure(AppError(ErrorKind.AUTHENTICATION, "Сессия или сервер изменились"))
+                else {
+                    if (contracts.orders) contractCache[profile.baseUrl] = contracts to System.nanoTime()
+                    Outcome.Success(contracts)
+                }
+            }
+        }
+    }
+    suspend fun orders(warehouseId: Long, view: String, limit: Int, offset: Long) = request(missingRoute = true) { api, _ -> api.orders(warehouseId, view, limit, offset) }
+    suspend fun order(id: Long) = request(missingRoute = true) { api, _ -> api.order(id) }
+    suspend fun sheetCatalog() = request(missingRoute = true) { api, _ -> api.sheetCatalog() }
+    suspend fun stockSummary(warehouseId: Long, on: String) = request(missingRoute = true) { api, _ -> api.stockSummary(warehouseId, on) }
+    suspend fun sheetRequests(warehouseId: Long) = request(missingRoute = true) { api, _ -> api.sheetRequests(warehouseId) }
     private val calls = AuthenticatedRequestExecutor(factory, current, errors)
     private suspend fun <T> request(missingRoute: Boolean = false, block: suspend (WorkshopApi, SessionSnapshot) -> Response<T>): Outcome<T> =
         calls.request(WorkshopApi::class.java, missingRoute, block = block)

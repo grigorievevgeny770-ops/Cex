@@ -63,7 +63,7 @@ class TaskDetailViewModel @Inject constructor(savedStateHandle: SavedStateHandle
             val current = uiState.value
             val unresolvedId = current.pending?.id
             val recovered = commands.firstOrNull { it.id == unresolvedId && it.state == PendingState.ACKNOWLEDGED }?.confirmation
-            val blocked = commands.firstOrNull { it.taskId == taskId && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
+            val blocked = commands.firstOrNull { it.taskId == taskId && !it.action.startsWith("REQUEST_") && !it.action.startsWith("SHEET_") && it.state !in setOf(PendingState.ACKNOWLEDGED, PendingState.REJECTED) }
             mutableState.update { it.copy(pending = blocked, lastConfirmation = recovered ?: it.lastConfirmation, closeError = if (recovered != null) null else it.closeError, retryError = if (recovered != null) null else it.retryError) }
             if (recovered != null) refresh()
         } }
