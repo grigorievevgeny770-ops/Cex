@@ -1,0 +1,100 @@
+package com.logunovinc.workshopmanager.data.repository
+
+import com.logunovinc.workshopmanager.data.local.pending.JournalMapper
+import com.logunovinc.workshopmanager.data.remote.*
+import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.order.*
+import com.logunovinc.workshopmanager.domain.pending.*
+import java.math.BigDecimal
+import java.time.LocalDate
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.*
+import okhttp3.mockwebserver.*
+import org.junit.*
+import org.junit.Assert.*
+
+class WorkshopOrderContractTest {
+    private lateinit var server: MockWebServer
+    private lateinit var repository: RealWorkshopOrderRepository
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
+    private fun reply(body: String, status: Int = 200) = MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json").setBody(body)
+    private val order = """{"id":7,"version":3,"status":"in_progress","due_at":"2026-11-20T00:00:00Z","comment":"кромка","allowed_actions":["manufacture"],"lines":[{"id":1,"catalog_product_id":501,"product_name":"Конёк простой 2000","size":"2000","quantity":"2","unit":"шт","norm_known":true},{"id":2,"catalog_product_id":502,"product_name":"Отлив П100х1250","size":"1250","quantity":"1","unit":"шт","norm_known":false}]}"""
+    private fun ack(status: String, version: Int = 4) = """{"result":{"id":7,"duplicate":false},"request":{"id":7,"version":$version,"status":"$status"}}"""
+    @Before fun before() {
+        server = MockWebServer().apply { start() }
+        val snapshot = SessionSnapshot(server.url("/").toString(), 42, 0)
+        val current = object : CurrentSession {
+            override val profiles = flowOf(snapshot)
+            override fun snapshot() = snapshot
+            override fun matches(snapshot: SessionSnapshot) = snapshot == snapshot()
+            override fun invalidate(generation: Long) = Unit
+        }
+        val factory = ApiFactory(json, PersistentSessionCookieJar(MemoryCookies()))
+        val errors = ApiErrorMapper(json)
+        val dispatcher = CommandDispatcher(TasksContractTest.MemoryJournal(), OkHttpCommandSender(factory, current), current, json, errors, JournalMapper(json))
+        repository = RealWorkshopOrderRepository(WorkshopRemoteDataSource(factory, current, errors), dispatcher, json, errors)
+    }
+    @After fun after() { server.shutdown() }
+    @Test fun absentContractDoesNotCallOrderRoutes() = runBlocking {
+        server.enqueue(reply("""{"paths":{}}"""))
+        val contracts = repository.contracts() as Outcome.Success
+        assertFalse(contracts.value.orders)
+        assertFalse(contracts.value.stockSummary)
+        assertFalse(contracts.value.sheetRequests)
+        assertEquals("/openapi.json", server.takeRequest().path)
+        assertNull(server.takeRequest(50, java.util.concurrent.TimeUnit.MILLISECONDS))
+    }
+    @Test fun manufactureWithoutNormSendsActualSheetAndKnownNormSendsNoMaterials() = runBlocking {
+        server.enqueue(reply("""{"paths":{"/api/workshop/requests":{"get":{}},"/api/workshop/stock-summary":{"get":{}},"/api/workshop/sheet-requests":{"get":{}}}}"""))
+        assertTrue((repository.contracts() as Outcome.Success).value.orders)
+        server.takeRequest()
+        server.enqueue(reply("""{"items":[$order],"total":1,"limit":50,"offset":0}"""))
+        val listed = (repository.orders(42, OrderView.ACTIVE) as Outcome.Success).value.items.single()
+        val query = server.takeRequest().requestUrl!!
+        assertEquals(setOf("warehouse_id", "view", "limit", "offset"), query.queryParameterNames)
+        assertEquals("active", query.queryParameter("view"))
+        assertEquals(false, listed.needsActualSheet.not() && listed.lines.any { it.normKnown == false })
+        assertTrue(listed.needsActualSheet)
+        server.enqueue(reply(ack("manufactured")))
+        val made = WorkshopOrders(repository).manufacture(listed, listOf(SheetUse(900, 2, BigDecimal("1.250")))) as CommandOutcome.Confirmed
+        val body = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals(setOf("expected_version", "client_token", "materials"), body.keys)
+        assertEquals(3, body["expected_version"]!!.jsonPrimitive.int)
+        val material = body["materials"]!!.jsonArray.single().jsonObject
+        assertEquals(900, material["product_id"]!!.jsonPrimitive.int)
+        assertEquals(2, material["sheets"]!!.jsonPrimitive.int)
+        assertEquals("1.250", material["sheet_length_m"]!!.jsonPrimitive.content)
+        assertFalse(made.confirmation.terminal)
+        val known = listed.copy(lines = listed.lines.map { it.copy(normKnown = true) })
+        server.enqueue(reply(ack("manufactured", 5)))
+        assertTrue(WorkshopOrders(repository).manufacture(known, emptyList()) is CommandOutcome.Confirmed)
+        val bare = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals(setOf("expected_version", "client_token"), bare.keys)
+    }
+    @Test fun handOverIsTerminalAndReverseNamesTheStep() = runBlocking {
+        val handed = WorkshopOrder(7, 5, OrderStatus.HANDED_TO_WAREHOUSE, "handed_to_warehouse", null, "", emptyList(), setOf("reverse_hand_over"))
+        server.enqueue(reply("""{"result":{"id":7,"duplicate":false},"request":{"id":7,"version":6,"status":"manufactured"}}"""))
+        val reversed = repository.reverse(handed, ReverseTarget.HAND_OVER) as CommandOutcome.Confirmed
+        val request = server.takeRequest()
+        assertEquals("/api/workshop/requests/7/reverse", request.path)
+        val body = json.parseToJsonElement(request.body.readUtf8()).jsonObject
+        assertEquals("hand_over", body["target"]!!.jsonPrimitive.content)
+        assertEquals(setOf("expected_version", "client_token", "target"), body.keys)
+        assertFalse(reversed.confirmation.terminal)
+        server.enqueue(reply("""{"result":{"id":7,"duplicate":false},"request":{"id":7,"version":7,"status":"handed_to_warehouse"}}"""))
+        val again = repository.handOver(handed.copy(version = 6, status = OrderStatus.MANUFACTURED, allowedActions = setOf("hand_over"))) as CommandOutcome.Confirmed
+        assertTrue(again.confirmation.terminal)
+        assertEquals("/api/workshop/requests/7/hand-over", server.takeRequest().path)
+    }
+    @Test fun summaryUsesServerDayAndDoesNotInventSections() = runBlocking {
+        server.enqueue(reply("""{"flat_sheet":[{"product_id":900,"product_name":"Лист","size":"1.25","quantity":"3","unit":"м²","sheets":4}],"awaiting_transfer":[],"transferred_on":[{"product_id":501,"product_name":"Конёк простой 2000","size":"2000","quantity":"2","unit":"шт"}]}"""))
+        val summary = repository.stockSummary(42, LocalDate.parse("2026-11-06")) as Outcome.Success
+        val query = server.takeRequest().requestUrl!!
+        assertEquals("/api/workshop/stock-summary", query.encodedPath)
+        assertEquals("2026-11-06", query.queryParameter("on"))
+        assertEquals(1, summary.value.flatSheet.size)
+        assertTrue(summary.value.awaitingTransfer.isEmpty())
+        assertEquals("Конёк простой 2000", summary.value.transferredOn.single().productName)
+    }
+}

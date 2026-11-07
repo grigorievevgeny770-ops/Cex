@@ -3,9 +3,12 @@ package com.logunovinc.workshopmanager.feature.stock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.order.WorkshopOrders
+import com.logunovinc.workshopmanager.domain.order.WorkshopStockSummary
 import com.logunovinc.workshopmanager.domain.stock.*
 import com.logunovinc.workshopmanager.domain.task.Page
 import com.logunovinc.workshopmanager.domain.warehouse.*
+import java.time.LocalDate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -15,7 +18,8 @@ import kotlinx.coroutines.launch
 
 data class StockListUiState(val loading: Boolean = true, val refreshing: Boolean = false, val pullRefreshing: Boolean = false, val loadingMore: Boolean = false,
     val warehouse: Warehouse? = null, val filter: StockFilter = StockFilter(), val items: List<StockPosition> = emptyList(),
-    val total: Long = 0, val nextOffset: Long = 0, val hasMore: Boolean = false, val error: AppError? = null)
+    val total: Long = 0, val nextOffset: Long = 0, val hasMore: Boolean = false, val error: AppError? = null,
+    val summary: WorkshopStockSummary? = null, val showSheetRequests: Boolean = false)
 sealed interface StockListIntent {
     data object PullRefresh : StockListIntent
     data object Refresh : StockListIntent
@@ -23,7 +27,7 @@ sealed interface StockListIntent {
     data class QueryChanged(val value: String) : StockListIntent
 }
 @HiltViewModel
-class StockListViewModel @Inject constructor(private val resolve: ResolveWorkshopUseCase, private val load: LoadStockUseCase) : ViewModel() {
+class StockListViewModel @Inject constructor(private val resolve: ResolveWorkshopUseCase, private val load: LoadStockUseCase, private val orders: WorkshopOrders) : ViewModel() {
     private val mutableState = MutableStateFlow(StockListUiState())
     val uiState = mutableState.asStateFlow()
     private var job: Job? = null
@@ -51,10 +55,17 @@ class StockListViewModel @Inject constructor(private val resolve: ResolveWorksho
             if (debounce) delay(300)
             when (val warehouse = resolve()) {
                 is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = null, items = emptyList(), total = 0, hasMore = false, error = warehouse.error) }
-                is Outcome.Success -> when (val page = refreshRange(warehouse.value.id, filter, retainedOffset)) {
-                    is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value, error = page.error) }
-                    is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value,
-                        items = page.value.items, total = page.value.total, nextOffset = page.value.nextOffset, hasMore = page.value.hasMore) }
+                is Outcome.Success -> {
+                    val contracts = (orders.contracts() as? Outcome.Success)?.value
+                    if (contracts?.stockSummary == true) when (val summary = orders.stockSummary(warehouse.value.id, LocalDate.now(java.time.ZoneId.of("Europe/Moscow")))) {
+                        is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value, showSheetRequests = contracts.sheetRequests, error = summary.error) }
+                        is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value,
+                            items = emptyList(), summary = summary.value, showSheetRequests = contracts.sheetRequests, hasMore = false, error = null) }
+                    } else when (val page = refreshRange(warehouse.value.id, filter, retainedOffset)) {
+                        is Outcome.Failure -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value, summary = null, showSheetRequests = false, error = page.error) }
+                        is Outcome.Success -> if (request == generation) mutableState.update { it.copy(loading = false, refreshing = false, pullRefreshing = false, warehouse = warehouse.value, summary = null, showSheetRequests = false,
+                            items = page.value.items, total = page.value.total, nextOffset = page.value.nextOffset, hasMore = page.value.hasMore) }
+                    }
                 }
             }
         }

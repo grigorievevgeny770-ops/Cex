@@ -18,7 +18,7 @@ import kotlinx.serialization.json.Json
 @InstallIn(SingletonComponent::class)
 object PersistenceModule {
     @Provides @Singleton fun database(@ApplicationContext context: Context): CommandDatabase =
-        Room.databaseBuilder(context, CommandDatabase::class.java, "pending-commands.db").build()
+        Room.databaseBuilder(context, CommandDatabase::class.java, "pending-commands.db").addMigrations(com.logunovinc.workshopmanager.data.local.pending.CommandMigrations.V1_TO_V2).build()
     @Provides @Singleton fun journal(database: CommandDatabase): CommandJournal = RoomCommandJournal(database)
     @Provides @Singleton fun journalMapper(json: Json) = JournalMapper(json)
     @Provides @Singleton fun sender(factory: ApiFactory, current: CurrentSession): RawCommandSender = OkHttpCommandSender(factory, current)

@@ -2,6 +2,7 @@ package com.logunovinc.workshopmanager.feature.stock
 
 import androidx.lifecycle.SavedStateHandle
 import com.logunovinc.workshopmanager.domain.*
+import com.logunovinc.workshopmanager.domain.order.*
 import com.logunovinc.workshopmanager.domain.stock.*
 import com.logunovinc.workshopmanager.domain.task.Page
 import com.logunovinc.workshopmanager.domain.warehouse.*
@@ -40,7 +41,7 @@ class StockViewModelsTest {
         val old = CompletableDeferred<Unit>()
         repository.listing = { filter, _ -> if (filter.query.isEmpty()) withContext(NonCancellable) { old.await(); Outcome.Success(Page(listOf(Stock.position(1)), 1, 50, 0)) }
             else Outcome.Success(Page(listOf(Stock.position(2)), 1, 50, 0)) }
-        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository))
+        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository), WorkshopOrders(NoStockOrders))
         runCurrent()
         vm.onIntent(StockListIntent.QueryChanged("new"))
         advanceTimeBy(301); runCurrent()
@@ -52,7 +53,7 @@ class StockViewModelsTest {
     @Test fun pagingBeyondFiftyAlwaysIncludesUnavailableStock() = runTest(dispatcher) {
         val repository = Stock()
         repository.listing = { _, offset -> Outcome.Success(Page((offset until minOf(offset + 50, 55)).map { Stock.position(it + 1) }, 55, 50, offset)) }
-        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository))
+        val vm = StockListViewModel(ResolveWorkshopUseCase(Warehouses()), LoadStockUseCase(repository), WorkshopOrders(NoStockOrders))
         runCurrent()
         assertFalse(repository.lastFilter!!.onlyAvailable)
         vm.onIntent(StockListIntent.LoadMore); vm.onIntent(StockListIntent.LoadMore)
@@ -64,7 +65,7 @@ class StockViewModelsTest {
     }
     @Test fun revokedWorkshopClearsCachedRowsAndShowsPermissionError() = runTest(dispatcher) {
         val warehouse = Warehouses()
-        val vm = StockListViewModel(ResolveWorkshopUseCase(warehouse), LoadStockUseCase(Stock()))
+        val vm = StockListViewModel(ResolveWorkshopUseCase(warehouse), LoadStockUseCase(Stock()), WorkshopOrders(NoStockOrders))
         runCurrent()
         assertEquals(1, vm.uiState.value.items.size)
         warehouse.result = Outcome.Failure(AppError(ErrorKind.FORBIDDEN, "Нет доступа"))
@@ -83,4 +84,18 @@ class StockViewModelsTest {
         assertEquals(BigDecimal("5"), vm.uiState.value.position!!.quantity)
         assertEquals(2, stock.calls)
     }
+}
+
+private object NoStockOrders : WorkshopOrderRepository {
+    override suspend fun contracts() = Outcome.Success(WorkshopContracts(false, false, false))
+    override suspend fun orders(warehouseId: Long, view: OrderView, limit: Int, offset: Long) = error("unused")
+    override suspend fun order(id: Long) = error("unused")
+    override suspend fun start(order: WorkshopOrder) = error("unused")
+    override suspend fun manufacture(order: WorkshopOrder, materials: List<SheetUse>) = error("unused")
+    override suspend fun handOver(order: WorkshopOrder) = error("unused")
+    override suspend fun reverse(order: WorkshopOrder, target: ReverseTarget) = error("unused")
+    override suspend fun stockSummary(warehouseId: Long, on: java.time.LocalDate) = error("unused")
+    override suspend fun sheetRequests(warehouseId: Long) = error("unused")
+    override suspend fun requestSheet(warehouseId: Long, productId: Long, length: java.math.BigDecimal, sheets: Int) = error("unused")
+    override suspend fun receiveSheet(request: SheetRequest) = error("unused")
 }

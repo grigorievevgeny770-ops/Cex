@@ -16,12 +16,12 @@ interface CommandJournal {
 class RoomCommandJournal(private val database: CommandDatabase) : CommandJournal {
     private val dao get() = database.commands()
     override suspend fun prepare(command: PendingCommandEntity): PrepareResult = database.withTransaction {
-        val existing = dao.byFingerprint(command.baseUrl, command.actorId, command.taskId, command.fingerprint)
-            ?: dao.active(command.baseUrl, command.actorId, command.taskId)
+        val existing = dao.byFingerprint(command.baseUrl, command.actorId, command.taskId, command.fingerprint, command.scope)
+            ?: dao.active(command.baseUrl, command.actorId, command.taskId, command.scope)
         if (existing != null) PrepareResult.Existing(existing)
         else {
             dao.insert(command)
-            dao.insertSlot(ActiveCommandEntity(command.baseUrl, command.actorId, command.taskId, command.id))
+            dao.insertSlot(ActiveCommandEntity(command.baseUrl, command.actorId, command.taskId, command.id, command.scope))
             PrepareResult.Created(command)
         }
     }

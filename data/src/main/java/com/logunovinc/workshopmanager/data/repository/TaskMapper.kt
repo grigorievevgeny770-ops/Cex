@@ -25,7 +25,8 @@ class TaskMapper {
             closedIncompleteBy = value.closedIncompleteBy, closedIncompleteAt = value.closedIncompleteAt?.let(::instant),
             allowedActions = value.allowedActions.toSet(), production = value.production?.let { ProductionMapper().descriptor(it) },
             executions = value.executions.map(::execution), history = value.history.map(::history),
-            discrepancies = value.discrepancies.map { Discrepancy(it.id, it.status, it.missing, it.unresolved, it.reason) })
+            discrepancies = value.discrepancies.map { Discrepancy(it.id, it.status, it.missing, it.unresolved, it.reason) },
+            legacyStatus = value.status, startedAt = value.startedAt?.let(::instant))
     }
     private fun line(value: TaskLineDto) = TaskLine(value.id, value.productId, value.productName, value.sku, value.role,
         value.baseUnit, value.unitName, value.planned, value.actual, value.remaining, value.plannedUnit, value.actualUnit, value.remainingUnit,

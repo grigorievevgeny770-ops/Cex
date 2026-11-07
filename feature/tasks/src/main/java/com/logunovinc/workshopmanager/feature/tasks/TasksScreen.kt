@@ -19,7 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 @Composable
-fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, consumeCompletion: () -> String? = { null }) {
+fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, onOrderClick: (Long) -> Unit = {}, consumeCompletion: () -> String? = { null }) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val completion by rememberUpdatedState(consumeCompletion)
@@ -30,7 +30,7 @@ fun TaskListRoute(viewModel: TaskListViewModel, onTaskClick: (Long) -> Unit, con
             while (isActive) { delay(30_000); viewModel.onIntent(TaskListIntent.Poll) }
         }
     }
-    TaskListScreen(state, viewModel::onIntent, onTaskClick)
+    if (state.orderMode) OrderListScreen(state, viewModel::onIntent, onOrderClick) else TaskListScreen(state, viewModel::onIntent, onTaskClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
