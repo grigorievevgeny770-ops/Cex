@@ -12,11 +12,13 @@ import kotlinx.serialization.Serializable
     @SerialName("allowed_actions") val allowedActions: List<String> = emptyList(),
 )
 @Serializable data class WorkshopOrderLineDto(
+    @SerialName("drawing_version") val drawingVersion: Long? = null,
     val id: Long,
     @SerialName("catalog_product_id") val productId: Long,
     @SerialName("product_name") val productName: String,
     val size: String? = null, val quantity: BigDecimal, val unit: String = "",
     @SerialName("norm_known") val normKnown: Boolean? = null,
+    val color: String = "", @SerialName("thickness_mm") val thicknessMm: String = "",
 )
 @Serializable data class OrderCommandDto(
     @SerialName("expected_version") val expectedVersion: Long,

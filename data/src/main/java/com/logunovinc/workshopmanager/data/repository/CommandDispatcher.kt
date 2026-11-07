@@ -144,6 +144,7 @@ class CommandDispatcher(
             normalized == "api/workshop/v2/tasks/$taskId/manufacturing-executions" ||
             normalized == "api/workshop/tasks/$taskId/close-incomplete" ||
             normalized == "api/workshop/requests/$taskId/start" ||
+            normalized == "api/workshop/v2/requests/$taskId/manufacture-area" ||
             normalized == "api/workshop/requests/$taskId/manufacture" ||
             normalized == "api/workshop/requests/$taskId/hand-over" ||
             normalized == "api/workshop/requests/$taskId/reverse" ||

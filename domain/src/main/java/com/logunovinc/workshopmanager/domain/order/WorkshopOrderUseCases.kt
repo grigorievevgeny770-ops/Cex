@@ -26,6 +26,9 @@ object OrderCommands {
 }
 
 class WorkshopOrders(private val repository: WorkshopOrderRepository) {
+    suspend fun drawing(requestId: Long, lineId: Long) = repository.drawing(requestId,lineId)
+    suspend fun manufactureArea(order: WorkshopOrder): CommandOutcome = if(order.canManufactureArea && order.version > 0) repository.manufactureArea(order)
+        else CommandOutcome.Rejected(null,AppError(ErrorKind.FORBIDDEN,"Выпуск по чертежу сейчас недоступен"))
     suspend fun sheetCatalog() = repository.sheetCatalog()
     suspend fun contracts() = repository.contracts()
     suspend fun orders(warehouseId: Long, view: OrderView, offset: Long = 0) = repository.orders(warehouseId, view, 50, offset)

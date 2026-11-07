@@ -76,6 +76,23 @@ class CommandDispatcherTest {
         assertTrue(create() is CommandOutcome.Confirmed)
         assertEquals(2, sends)
     }
+    @Test fun unknownAreaManufactureSurvivesDispatcherRecreationWithoutChangingBody() = runBlocking {
+        val sent=mutableListOf<ByteArray>()
+        val network=sender { command -> sent.add(command.body.copyOf());throw IOException("response lost") }
+        val first=dispatcher(network).submit(101,"REQUEST_MANUFACTURE_AREA","POST","api/workshop/v2/requests/101/manufacture-area",summary) { token ->
+            """{"expected_version":9,"client_token":"$token"}""".toByteArray()
+        } as CommandOutcome.Unresolved
+        assertEquals("request",room.get(first.command.id)!!.scope)
+        val recreated=dispatcher(network)
+        val blocked=recreated.submit(101,"REQUEST_MANUFACTURE_AREA","POST","api/workshop/v2/requests/101/manufacture-area",summary) { token ->
+            """{"expected_version":9,"client_token":"$token"}""".toByteArray()
+        }
+        assertTrue(blocked is CommandOutcome.Unresolved)
+        assertEquals(1,sent.size)
+        recreated.retry(first.command.id)
+        assertEquals(2,sent.size)
+        assertArrayEquals(sent[0],sent[1])
+    }
     private fun dispatcher(sender: RawCommandSender, journal: CommandJournal = room, registry: CommandMutexRegistry = CommandMutexRegistry.process) =
         CommandDispatcher(journal, sender, session, json, errors, mapper, registry)
     private suspend fun submit(dispatcher: CommandDispatcher) = dispatcher.submit(101, "DISPATCH_GOODS", "POST", "api/workshop/tasks/101/executions", summary) { token ->

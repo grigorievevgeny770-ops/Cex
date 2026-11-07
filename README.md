@@ -1,3 +1,5 @@
+> Ветка v1.1: [DRAWINGS_V11.md](DRAWINGS_V11.md) — чертежи и серверный выпуск по площади; [PRODUCTION_REQUESTS.md](PRODUCTION_REQUESTS.md) — общий workflow заявок.
+
 # Цех — Android
 
 Приложение работника склада: задания, приёмка, отправка, производство по

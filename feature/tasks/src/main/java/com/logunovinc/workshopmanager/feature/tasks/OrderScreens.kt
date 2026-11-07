@@ -78,14 +78,18 @@ fun OrderDetailScreen(state: OrderDetailUiState, onIntent: (OrderDetailIntent) -
             items(order.lines, key = { "line-${it.id}" }) { line ->
                 Card { Column(Modifier.padding(16.dp)) {
                     Text(line.productName, style = MaterialTheme.typography.titleMedium)
+                    if(line.color.isNotBlank()||line.thicknessMm.isNotBlank())Text("Цвет ${line.color} · толщина ${line.thicknessMm} мм")
                     Text("Количество ${QuantityFormatter.format(line.quantity)} ${line.unit}")
                     line.size?.let { Text("Размер $it") }
-                    Text(when (line.normKnown) { true -> "Норма есть на сервере"; false -> "Нормы нет: нужен фактический расход листа"; null -> "Про норму сервер ничего не сообщил" })
+                    if(line.drawingVersion==null)Text(when (line.normKnown) { true -> "Норма есть на сервере"; false -> "Нормы нет: нужен фактический расход листа"; null -> "Про норму сервер ничего не сообщил" })
+                    state.drawings[line.id]?.let { ProfileDrawingContent(it) }
+                    state.drawingErrors[line.id]?.let { Text(it.message,color=MaterialTheme.colorScheme.error) }
                 } }
             }
             item {
                 if (order.canStart) Button(onClick = { onIntent(OrderDetailIntent.Start) }, modifier = Modifier.fillMaxWidth().testTag("order-start")) { Text("Взять в работу") }
                 if (order.canManufacture && !order.normUnspecified) Button(onClick = { onIntent(OrderDetailIntent.Manufacture) }, modifier = Modifier.fillMaxWidth().testTag("order-manufacture")) { Text("Изготовлено") }
+                if(order.canManufactureArea)Button(onClick={onIntent(OrderDetailIntent.ManufactureArea)},enabled=!state.loading&&!state.sending&&state.pending==null&&order.lines.all { line -> line.drawingVersion!=null&&state.drawings[line.id]?.version==line.drawingVersion },modifier=Modifier.fillMaxWidth().testTag("order-manufacture-area")){Text("Изготовлено · расход по чертежам")}
                 if (order.canHandOver) Button(onClick = { onIntent(OrderDetailIntent.HandOver) }, modifier = Modifier.fillMaxWidth().testTag("order-hand-over")) { Text("Передано на склад") }
                 if (order.canReverseManufacture) OutlinedButton(onClick = { onIntent(OrderDetailIntent.ReverseManufacture) }, modifier = Modifier.fillMaxWidth().testTag("order-reverse-manufacture")) { Text("Отменить изготовление") }
                 if (order.canReverseHandOver) OutlinedButton(onClick = { onIntent(OrderDetailIntent.ReverseHandOver) }, modifier = Modifier.fillMaxWidth().testTag("order-reverse-hand-over")) { Text("Отменить передачу") }
@@ -98,6 +102,7 @@ fun OrderDetailScreen(state: OrderDetailUiState, onIntent: (OrderDetailIntent) -
             title = { Text(when (confirm) {
                 OrderConfirm.Start -> "Взять заявку в работу?"
                 OrderConfirm.Manufacture -> "Отметить, что всё изготовлено?"
+                OrderConfirm.ManufactureArea -> "Все изделия изготовлены?"
                 OrderConfirm.HandOver -> "Передать всё на склад?"
                 is OrderConfirm.Reverse -> "Отменить шаг? Движения будут обращены, история сохранится."
             }) },
@@ -111,6 +116,7 @@ fun OrderDetailScreen(state: OrderDetailUiState, onIntent: (OrderDetailIntent) -
                     TextButton(onClick = { onIntent(OrderDetailIntent.AddSheet) }) { Text("Добавить расход") }
                     state.materials.forEachIndexed { index, material -> Text("${material.sheets} лист. × ${QuantityFormatter.format(material.length)} м") ; TextButton(onClick = { onIntent(OrderDetailIntent.RemoveSheet(index)) }) { Text("Убрать") } }
                 } else if (confirm == OrderConfirm.Manufacture) Text("Сервер спишет лист по своей норме. Количество изделий не меняется.")
+                if(confirm==OrderConfirm.ManufactureArea)Text("Сервер рассчитает и спишет площадь плоского листа по сохранённым чертежам. Выпускается вся заявка.")
                 order.lines.forEach { Text("${it.productName}: ${QuantityFormatter.format(it.quantity)} ${it.unit}") }
             } },
             confirmButton = { Button(onClick = { onIntent(OrderDetailIntent.Confirm) }, enabled = !state.sending, modifier = Modifier.testTag("order-confirm")) { Text(if (state.sending) "Отправляем…" else "Подтвердить") } },

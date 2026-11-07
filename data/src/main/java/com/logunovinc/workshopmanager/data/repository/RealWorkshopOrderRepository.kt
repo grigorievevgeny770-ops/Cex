@@ -8,6 +8,7 @@ import com.logunovinc.workshopmanager.domain.order.*
 import com.logunovinc.workshopmanager.domain.pending.*
 import com.logunovinc.workshopmanager.domain.task.Page
 import java.time.LocalDate
+import java.math.BigDecimal
 import java.time.OffsetDateTime
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -33,7 +34,7 @@ class RealWorkshopOrderRepository(
     }
     private fun order(value: WorkshopOrderDto) = WorkshopOrder(
         value.id, value.version, status(value.status), value.status, value.dueAt?.let(::instant), value.comment,
-        value.lines.map { OrderLine(it.id, it.productId, it.productName, it.size, it.quantity, it.unit, it.normKnown) },
+        value.lines.map { OrderLine(it.id, it.productId, it.productName, it.size, it.quantity, it.unit, it.normKnown, it.drawingVersion,it.color,it.thicknessMm) },
         value.allowedActions.toSet(),
     )
     private fun line(value: StockSummaryLineDto) = StockSummaryLine(value.productId, value.productName, value.size, value.quantity, value.unit, value.sheets)
@@ -51,6 +52,20 @@ class RealWorkshopOrderRepository(
         Page(it.items.map(::order), it.total, it.limit, it.offset)
     }
     override suspend fun order(id: Long) = map(remote.order(id), ::order)
+    override suspend fun drawing(requestId: Long,lineId: Long) = map(remote.drawing(requestId,lineId)) { dto ->
+        val d=dto.drawing
+        require(dto.requestId==requestId && dto.lineId==lineId && dto.version>0 && dto.schemaVersion==1 && d.schemaVersion==1)
+        require(d.segments.isNotEmpty() && d.segments.size<=100 && d.angles.size==d.segments.size-1 && d.turns.size==d.angles.size)
+        require(d.lengthMm>0 && dto.blankWidthMm>0 && d.segments.all { it.startMm>0 && (!d.skewed || (it.endMm ?: 0)>0) })
+        require(d.skewed || d.segments.all { it.endMm==null || it.endMm==it.startMm })
+        require(d.angles.all { it.signum()>0 && it<BigDecimal("180") } && d.turns.all { it in setOf("left","right") })
+        require(listOf(d.edge1,d.edge2).all { it.type in setOf("none","hem","seam") && it.direction in setOf("in","out") })
+        ProfileDrawing(dto.requestId,dto.lineId,dto.version,d.skewed,d.lengthMm,dto.blankWidthMm,
+            d.segments.map { ProfileSegment(it.startMm,it.endMm) },d.angles,d.turns,ProfileEdge(d.edge1.type,d.edge1.direction),ProfileEdge(d.edge2.type,d.edge2.direction))
+    }
+    override suspend fun manufactureArea(order: WorkshopOrder) = command(order,"REQUEST_MANUFACTURE_AREA","api/workshop/v2/requests/${order.id}/manufacture-area","Изготовлено · расход по чертежам") { token ->
+        json.encodeToString(OrderCommandDto(order.version,token)).toByteArray()
+    }
     private suspend fun command(order: WorkshopOrder, action: String, path: String, title: String, body: (String) -> ByteArray): CommandOutcome {
         if (order.status == OrderStatus.UNKNOWN) return CommandOutcome.Rejected(null, AppError(ErrorKind.INCOMPATIBLE_SERVER, "Неизвестный статус заявки"))
         val profile = remote.sessionSnapshot() ?: return CommandOutcome.Rejected(null, AppError(ErrorKind.AUTHENTICATION, "Требуется вход"))

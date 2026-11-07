@@ -47,6 +47,7 @@ class WorkshopRemoteDataSource(private val factory: ApiFactory, private val curr
     }
     suspend fun orders(warehouseId: Long, view: String, limit: Int, offset: Long) = request(missingRoute = true) { api, _ -> api.orders(warehouseId, view, limit, offset) }
     suspend fun order(id: Long) = request(missingRoute = true) { api, _ -> api.order(id) }
+    suspend fun drawing(requestId: Long,lineId: Long) = request(missingRoute = true) { api,_ -> api.drawing(requestId,lineId) }
     suspend fun sheetCatalog() = request(missingRoute = true) { api, _ -> api.sheetCatalog() }
     suspend fun stockSummary(warehouseId: Long, on: String) = request(missingRoute = true) { api, _ -> api.stockSummary(warehouseId, on) }
     suspend fun sheetRequests(warehouseId: Long) = request(missingRoute = true) { api, _ -> api.sheetRequests(warehouseId) }
