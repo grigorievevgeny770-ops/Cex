@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class) @Config(sdk = [34])
 class ManufacturingRecoveryTest {
-    @Test fun lostPrototypeReplyDatabaseReopenRetriesOriginalPrototypeAlthoughRecipeIsAlreadyReady() = runBlocking {
+    @Test fun prototypeReopenKeepsOriginalBytes() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "prototype-recovery-${UUID.randomUUID()}.db"
         var database = Room.databaseBuilder(context, CommandDatabase::class.java, name).allowMainThreadQueries().build()

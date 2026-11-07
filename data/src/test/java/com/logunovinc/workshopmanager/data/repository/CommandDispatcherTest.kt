@@ -191,7 +191,7 @@ class CommandDispatcherTest {
         assertTrue(command.uncertain)
         assertNotNull(database.commands().active(command.baseUrl, 42, 101))
     }
-    @Test fun serverAcceptsLostReplyThenDatabaseReopenRepeatsByteIdentically() = runBlocking {
+    @Test fun lostReplyReopenReplaysExactBytes() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "pending-test-${UUID.randomUUID()}.db"
         database.close()
@@ -263,7 +263,7 @@ class CommandDispatcherTest {
         assertArrayEquals(exact, room.get(saved.id)!!.body)
     }
 
-    @Test fun closeIncompleteUnknownSurvivesRoomReopenAndPermissionsErrorWithoutChangingReason() = runBlocking {
+    @Test fun closeUnknownReopenKeepsReason() = runBlocking {
         val context=ApplicationProvider.getApplicationContext<Context>()
         val name="close-test-${UUID.randomUUID()}.db"
         database.close()
