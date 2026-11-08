@@ -5,6 +5,8 @@ import retrofit2.Response
 import retrofit2.http.*
 
 interface WorkshopApi {
+    @GET("api/workshop/v2/requests/{request}/area-preview") suspend fun areaPreview(@Path("request") requestId:Long):Response<AreaPreviewDto>
+    @GET("api/workshop/v2/requests/{request}/lines/{line}/drawing") suspend fun drawing(@Path("request") requestId: Long,@Path("line") lineId: Long): Response<ProfileDrawingDto>
     @GET("api/workshop/request-catalog?sheets=true") suspend fun sheetCatalog(): Response<List<ProductDto>>
     @GET("api/warehouses") suspend fun warehouses(@Query("include_inactive") includeInactive: Boolean = true): Response<List<WarehouseDto>>
     @GET("openapi.json") suspend fun capabilities(): Response<WorkshopCapabilitiesDto>

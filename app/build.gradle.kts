@@ -28,8 +28,8 @@ android {
         minSdk = 26
         applicationId = "com.logunovinc.workshopmanager"
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.3.0"
         buildConfigField("String", "DEBUG_PREFILL_LOGIN", "\"\"")
         buildConfigField("String", "DEBUG_PREFILL_PASSWORD", "\"\"")
         testInstrumentationRunner = "com.logunovinc.workshopmanager.testing.WorkshopTestRunner"

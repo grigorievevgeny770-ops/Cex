@@ -17,6 +17,8 @@ data class WorkshopContracts(val orders: Boolean, val stockSummary: Boolean, val
 data class OrderLine(
     val id: Long, val productId: Long, val productName: String, val size: String?,
     val quantity: BigDecimal, val unit: String, val normKnown: Boolean?,
+    val drawingVersion: Long? = null,
+    val color: String = "", val thicknessMm: String = "",
 )
 
 data class WorkshopOrder(
@@ -25,6 +27,7 @@ data class WorkshopOrder(
 ) {
     val canStart: Boolean get() = status == OrderStatus.NEW && "start" in allowedActions
     val canManufacture: Boolean get() = status == OrderStatus.IN_PROGRESS && "manufacture" in allowedActions
+    val canManufactureArea: Boolean get() = status == OrderStatus.IN_PROGRESS && "manufacture_area" in allowedActions
     val canHandOver: Boolean get() = status == OrderStatus.MANUFACTURED && "hand_over" in allowedActions
     val canReverseManufacture: Boolean get() = status == OrderStatus.MANUFACTURED && "reverse_manufacture" in allowedActions
     val canReverseHandOver: Boolean get() = status == OrderStatus.HANDED_TO_WAREHOUSE && "reverse_hand_over" in allowedActions
@@ -53,6 +56,9 @@ data class SheetRequest(
 }
 
 interface WorkshopOrderRepository {
+    suspend fun areaPreview(requestId:Long):Outcome<AreaPreview> = Outcome.Failure(com.logunovinc.workshopmanager.domain.AppError(com.logunovinc.workshopmanager.domain.ErrorKind.INCOMPATIBLE_SERVER,"Сервер не поддерживает просмотр расхода"))
+    suspend fun drawing(requestId: Long, lineId: Long): Outcome<ProfileDrawing> = Outcome.Failure(com.logunovinc.workshopmanager.domain.AppError(com.logunovinc.workshopmanager.domain.ErrorKind.INCOMPATIBLE_SERVER,"Сервер не поддерживает чертежи"))
+    suspend fun manufactureArea(order: WorkshopOrder,previewHash:String?=null): CommandOutcome = CommandOutcome.Rejected(null,com.logunovinc.workshopmanager.domain.AppError(com.logunovinc.workshopmanager.domain.ErrorKind.INCOMPATIBLE_SERVER,"Сервер не поддерживает расход по площади"))
     suspend fun sheetCatalog(): Outcome<List<com.logunovinc.workshopmanager.domain.stock.Product>> = Outcome.Success(emptyList())
     suspend fun contracts(): Outcome<WorkshopContracts>
     suspend fun orders(warehouseId: Long, view: OrderView, limit: Int = 50, offset: Long = 0): Outcome<Page<WorkshopOrder>>

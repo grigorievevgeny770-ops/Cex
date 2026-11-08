@@ -26,6 +26,13 @@ object OrderCommands {
 }
 
 class WorkshopOrders(private val repository: WorkshopOrderRepository) {
+    suspend fun drawing(requestId: Long, lineId: Long) = repository.drawing(requestId,lineId)
+    suspend fun areaPreview(requestId:Long)=repository.areaPreview(requestId)
+    suspend fun manufactureArea(order: WorkshopOrder,preview:AreaPreview?): CommandOutcome = when {
+        !order.canManufactureArea || order.version<=0 -> CommandOutcome.Rejected(null,AppError(ErrorKind.FORBIDDEN,"Выпуск по чертежу сейчас недоступен"))
+        preview?.matches(order)!=true -> CommandOutcome.Rejected(null,AppError(ErrorKind.CONFLICT,"Обновите заявку и проверьте расход листа"))
+        else -> repository.manufactureArea(order,preview.hash)
+    }
     suspend fun sheetCatalog() = repository.sheetCatalog()
     suspend fun contracts() = repository.contracts()
     suspend fun orders(warehouseId: Long, view: OrderView, offset: Long = 0) = repository.orders(warehouseId, view, 50, offset)

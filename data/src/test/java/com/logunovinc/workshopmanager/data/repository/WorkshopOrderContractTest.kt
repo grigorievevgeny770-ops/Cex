@@ -97,4 +97,56 @@ class WorkshopOrderContractTest {
         assertTrue(summary.value.awaitingTransfer.isEmpty())
         assertEquals("Конёк простой 2000", summary.value.transferredOn.single().productName)
     }
+    private val profile = """{"request_id":7,"line_id":1,"version":2,"schema_version":1,"blank_width_mm":250,"drawing":{"schema_version":1,"skewed":true,"length_mm":2000,"segments":[{"start_mm":150,"end_mm":130},{"start_mm":80,"end_mm":100}],"angles_deg":["90.125"],"turns":["left"],"edge1":{"type":"hem","direction":"in"},"edge2":{"type":"seam","direction":"out"}}}"""
+    @Test fun drawingPreservesExactDimensionsAndAngles() = runBlocking {
+        server.enqueue(reply(profile))
+        val drawing=(repository.drawing(7,1) as Outcome.Success).value
+        assertEquals("/api/workshop/v2/requests/7/lines/1/drawing",server.takeRequest().path)
+        assertEquals(250L,drawing.blankWidthMm)
+        assertEquals(150L,drawing.segments[0].startMm)
+        assertEquals(130L,drawing.segments[0].endMm)
+        assertEquals(BigDecimal("90.125"),drawing.angles.single())
+        assertTrue(drawing.skewed)
+        assertEquals("out",drawing.edge2.direction)
+    }
+    @Test fun invalidOrUnknownDrawingCannotBeDisplayedAsValid() = runBlocking {
+        for(body in listOf(profile.replace("\"schema_version\":1","\"schema_version\":2"),
+            profile.replace("\"request_id\":7","\"request_id\":8"),
+            profile.replace("\"start_mm\":150","\"start_mm\":0"),
+            profile.replace("\"hem\"","\"unknown\""),profile.replace("90.125","180"))) {
+            server.enqueue(reply(body))
+            assertTrue(repository.drawing(7,1) is Outcome.Failure)
+            server.takeRequest()
+        }
+    }
+    @Test fun areaManufactureSendsOnlyVersionAndDurableToken() = runBlocking {
+        val request=WorkshopOrder(7,3,OrderStatus.IN_PROGRESS,"in_progress",null,"",emptyList(),setOf("manufacture_area"))
+        server.enqueue(reply(ack("manufactured")))
+        assertTrue(repository.manufactureArea(request) is CommandOutcome.Confirmed)
+        val sent=server.takeRequest()
+        assertEquals("/api/workshop/v2/requests/7/manufacture-area",sent.path)
+        val body=json.parseToJsonElement(sent.body.readUtf8()).jsonObject
+        assertEquals(setOf("expected_version","client_token"),body.keys)
+        assertEquals(3,body["expected_version"]!!.jsonPrimitive.int)
+        assertTrue(body["client_token"]!!.jsonPrimitive.content.isNotBlank())
+    }
+    private val area = """{"request_id":7,"request_version":3,"preview_hash":"${"a".repeat(64)}","formula_version":"profile-area-v1","total_area_m2":"0.2200","lines":[{"line_id":1,"drawing_version":2,"product_name":"Уголок","blank_width_mm":110,"length_mm":2000,"piece_quantity":"1","area_m2":"0.2200"}],"materials":[{"product_id":900,"product_name":"Лист","area_m2":"0.2200"}]}"""
+    @Test fun previewIsExactAndManufactureBindsTheShownCalculation()=runBlocking {
+        server.enqueue(reply(area))
+        val preview=(repository.areaPreview(7) as Outcome.Success).value
+        assertEquals("/api/workshop/v2/requests/7/area-preview",server.takeRequest().path)
+        assertEquals(BigDecimal("0.2200"),preview.totalAreaM2)
+        val request=WorkshopOrder(7,3,OrderStatus.IN_PROGRESS,"in_progress",null,"",listOf(OrderLine(1,501,"Уголок","2000",BigDecimal.ONE,"шт",false,2)),setOf("manufacture_area"))
+        server.enqueue(reply(ack("manufactured")))
+        assertTrue(WorkshopOrders(repository).manufactureArea(request,preview) is CommandOutcome.Confirmed)
+        val body=json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals(setOf("expected_version","client_token","preview_hash"),body.keys)
+        assertEquals(preview.hash,body["preview_hash"]!!.jsonPrimitive.content)
+    }
+    @Test fun unknownOrInconsistentPreviewIsRejectedWithoutSendingManufacture()=runBlocking {
+        for(body in listOf(area.replace("profile-area-v1","unknown-formula"),area.replace("\"request_id\":7","\"request_id\":8"),area.replace("\"total_area_m2\":\"0.2200\"","\"total_area_m2\":\"9.0000\""))) {
+            server.enqueue(reply(body));assertTrue(repository.areaPreview(7) is Outcome.Failure);server.takeRequest()
+        }
+        assertNull(server.takeRequest(50,java.util.concurrent.TimeUnit.MILLISECONDS))
+    }
 }
