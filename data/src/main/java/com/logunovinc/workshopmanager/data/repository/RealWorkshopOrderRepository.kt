@@ -63,8 +63,19 @@ class RealWorkshopOrderRepository(
         ProfileDrawing(dto.requestId,dto.lineId,dto.version,d.skewed,d.lengthMm,dto.blankWidthMm,
             d.segments.map { ProfileSegment(it.startMm,it.endMm) },d.angles,d.turns,ProfileEdge(d.edge1.type,d.edge1.direction),ProfileEdge(d.edge2.type,d.edge2.direction))
     }
-    override suspend fun manufactureArea(order: WorkshopOrder) = command(order,"REQUEST_MANUFACTURE_AREA","api/workshop/v2/requests/${order.id}/manufacture-area","Изготовлено · расход по чертежам") { token ->
-        json.encodeToString(OrderCommandDto(order.version,token)).toByteArray()
+    override suspend fun areaPreview(requestId:Long) = map(remote.areaPreview(requestId)) { dto ->
+        require(dto.requestId==requestId && dto.requestVersion>0 && dto.formulaVersion=="profile-area-v1" && dto.hash.matches(Regex("[a-f0-9]{64}")))
+        require(dto.totalAreaM2.signum()>0 && dto.lines.isNotEmpty() && dto.lines.size<=100 && dto.materials.isNotEmpty() && dto.materials.size<=100)
+        require(dto.lines.map { it.lineId }.toSet().size==dto.lines.size && dto.materials.map { it.productId }.toSet().size==dto.materials.size)
+        require(dto.lines.all { it.lineId>0 && it.drawingVersion>0 && it.blankWidthMm>0 && it.lengthMm>0 && it.pieceQuantity.signum()>0 && it.areaM2.signum()>0 })
+        require(dto.materials.all { it.productId>0 && it.areaM2.signum()>0 })
+        require(dto.lines.fold(BigDecimal.ZERO) { sum,l -> sum+l.areaM2 }.compareTo(dto.totalAreaM2)==0 && dto.materials.fold(BigDecimal.ZERO) { sum,m -> sum+m.areaM2 }.compareTo(dto.totalAreaM2)==0)
+        AreaPreview(dto.requestId,dto.requestVersion,dto.hash,dto.totalAreaM2,
+            dto.lines.map { AreaPreviewLine(it.lineId,it.drawingVersion,it.productName,it.blankWidthMm,it.lengthMm,it.pieceQuantity,it.areaM2) },
+            dto.materials.map { AreaPreviewMaterial(it.productId,it.productName,it.areaM2) })
+    }
+    override suspend fun manufactureArea(order: WorkshopOrder,previewHash:String?) = command(order,"REQUEST_MANUFACTURE_AREA","api/workshop/v2/requests/${order.id}/manufacture-area","Изготовлено · расход по чертежам") { token ->
+        json.encodeToString(AreaManufactureCommandDto(order.version,token,previewHash)).toByteArray()
     }
     private suspend fun command(order: WorkshopOrder, action: String, path: String, title: String, body: (String) -> ByteArray): CommandOutcome {
         if (order.status == OrderStatus.UNKNOWN) return CommandOutcome.Rejected(null, AppError(ErrorKind.INCOMPATIBLE_SERVER, "Неизвестный статус заявки"))

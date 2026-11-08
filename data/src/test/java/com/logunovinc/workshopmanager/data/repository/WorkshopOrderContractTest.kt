@@ -130,4 +130,23 @@ class WorkshopOrderContractTest {
         assertEquals(3,body["expected_version"]!!.jsonPrimitive.int)
         assertTrue(body["client_token"]!!.jsonPrimitive.content.isNotBlank())
     }
+    private val area = """{"request_id":7,"request_version":3,"preview_hash":"${"a".repeat(64)}","formula_version":"profile-area-v1","total_area_m2":"0.2200","lines":[{"line_id":1,"drawing_version":2,"product_name":"Уголок","blank_width_mm":110,"length_mm":2000,"piece_quantity":"1","area_m2":"0.2200"}],"materials":[{"product_id":900,"product_name":"Лист","area_m2":"0.2200"}]}"""
+    @Test fun previewIsExactAndManufactureBindsTheShownCalculation()=runBlocking {
+        server.enqueue(reply(area))
+        val preview=(repository.areaPreview(7) as Outcome.Success).value
+        assertEquals("/api/workshop/v2/requests/7/area-preview",server.takeRequest().path)
+        assertEquals(BigDecimal("0.2200"),preview.totalAreaM2)
+        val request=WorkshopOrder(7,3,OrderStatus.IN_PROGRESS,"in_progress",null,"",listOf(OrderLine(1,501,"Уголок","2000",BigDecimal.ONE,"шт",false,2)),setOf("manufacture_area"))
+        server.enqueue(reply(ack("manufactured")))
+        assertTrue(WorkshopOrders(repository).manufactureArea(request,preview) is CommandOutcome.Confirmed)
+        val body=json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals(setOf("expected_version","client_token","preview_hash"),body.keys)
+        assertEquals(preview.hash,body["preview_hash"]!!.jsonPrimitive.content)
+    }
+    @Test fun unknownOrInconsistentPreviewIsRejectedWithoutSendingManufacture()=runBlocking {
+        for(body in listOf(area.replace("profile-area-v1","unknown-formula"),area.replace("\"request_id\":7","\"request_id\":8"),area.replace("\"total_area_m2\":\"0.2200\"","\"total_area_m2\":\"9.0000\""))) {
+            server.enqueue(reply(body));assertTrue(repository.areaPreview(7) is Outcome.Failure);server.takeRequest()
+        }
+        assertNull(server.takeRequest(50,java.util.concurrent.TimeUnit.MILLISECONDS))
+    }
 }

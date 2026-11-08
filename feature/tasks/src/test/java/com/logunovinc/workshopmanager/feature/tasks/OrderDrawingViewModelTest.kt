@@ -23,11 +23,15 @@ class OrderDrawingViewModelTest {
         val row=WorkshopOrder(7,3,OrderStatus.IN_PROGRESS,"in_progress",null,"",listOf(OrderLine(1,501,"Уголок","2000",BigDecimal.ONE,"шт",false,2)),setOf("manufacture_area"))
         val drawing=ProfileDrawing(7,1,2,false,2000,110,listOf(ProfileSegment(100,null)),emptyList(),emptyList(),ProfileEdge("hem","in"),ProfileEdge("none","in"))
         var readDrawing:Outcome<ProfileDrawing> = Outcome.Success(drawing)
+        val preview=AreaPreview(7,3,"a".repeat(64),BigDecimal("0.2200"),listOf(AreaPreviewLine(1,2,"Уголок",110,2000,BigDecimal.ONE,BigDecimal("0.2200"))),listOf(AreaPreviewMaterial(900,"Плоский лист",BigDecimal("0.2200"))))
+        var readPreview:Outcome<AreaPreview> = Outcome.Success(preview)
+        var sentHash:String?=null
         var writes=0
         val release=CompletableDeferred<Unit>()
         override suspend fun drawing(requestId:Long,lineId:Long)=readDrawing
         override suspend fun order(id:Long)=Outcome.Success(row)
-        override suspend fun manufactureArea(order:WorkshopOrder):CommandOutcome {writes++;release.await();return CommandOutcome.Confirmed(CommandConfirmation("area",7,4,null,false))}
+        override suspend fun areaPreview(requestId:Long)=readPreview
+        override suspend fun manufactureArea(order:WorkshopOrder,previewHash:String?):CommandOutcome {writes++;sentHash=previewHash;release.await();return CommandOutcome.Confirmed(CommandConfirmation("area",7,4,null,false))}
         override suspend fun contracts():Outcome<WorkshopContracts> = error("unused")
         override suspend fun orders(warehouseId:Long,view:OrderView,limit:Int,offset:Long):Outcome<Page<WorkshopOrder>> = error("unused")
         override suspend fun start(order:WorkshopOrder):CommandOutcome = error("unused")
@@ -66,6 +70,17 @@ class OrderDrawingViewModelTest {
         assertEquals(OrderConfirm.ManufactureArea,vm.uiState.value.confirm)
         vm.onIntent(OrderDetailIntent.Confirm);vm.onIntent(OrderDetailIntent.Confirm);runCurrent()
         assertEquals(1,repo.writes);assertTrue(vm.uiState.value.sending)
+        assertEquals(repo.preview.hash,repo.sentHash)
         repo.release.complete(Unit);runCurrent();assertFalse(vm.uiState.value.sending)
+    }
+    @Test fun missingOrStaleAreaPreviewBlocksConfirmation()=runTest(dispatcher){
+        val sample=Orders()
+        for(result in listOf(Outcome.Failure(AppError(ErrorKind.NETWORK,"Расход не загружен")),
+            Outcome.Success(sample.preview.copy(requestVersion=4)),
+            Outcome.Success(sample.preview.copy(lines=sample.preview.lines.map { it.copy(drawingVersion=3) })))) {
+            val repo=Orders().apply{readPreview=result};val vm=vm(repo);runCurrent()
+            vm.onIntent(OrderDetailIntent.ManufactureArea);vm.onIntent(OrderDetailIntent.Confirm);runCurrent()
+            assertNull(vm.uiState.value.confirm);assertEquals(0,repo.writes);assertNotNull(vm.uiState.value.previewError)
+        }
     }
 }

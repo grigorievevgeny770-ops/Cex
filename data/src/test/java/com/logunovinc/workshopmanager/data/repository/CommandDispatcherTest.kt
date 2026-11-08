@@ -80,12 +80,12 @@ class CommandDispatcherTest {
         val sent=mutableListOf<ByteArray>()
         val network=sender { command -> sent.add(command.body.copyOf());throw IOException("response lost") }
         val first=dispatcher(network).submit(101,"REQUEST_MANUFACTURE_AREA","POST","api/workshop/v2/requests/101/manufacture-area",summary) { token ->
-            """{"expected_version":9,"client_token":"$token"}""".toByteArray()
+            """{"expected_version":9,"client_token":"$token","preview_hash":"${"a".repeat(64)}"}""".toByteArray()
         } as CommandOutcome.Unresolved
         assertEquals("request",room.get(first.command.id)!!.scope)
         val recreated=dispatcher(network)
         val blocked=recreated.submit(101,"REQUEST_MANUFACTURE_AREA","POST","api/workshop/v2/requests/101/manufacture-area",summary) { token ->
-            """{"expected_version":9,"client_token":"$token"}""".toByteArray()
+            """{"expected_version":9,"client_token":"$token","preview_hash":"${"a".repeat(64)}"}""".toByteArray()
         }
         assertTrue(blocked is CommandOutcome.Unresolved)
         assertEquals(1,sent.size)

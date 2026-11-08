@@ -56,8 +56,9 @@ data class SheetRequest(
 }
 
 interface WorkshopOrderRepository {
+    suspend fun areaPreview(requestId:Long):Outcome<AreaPreview> = Outcome.Failure(com.logunovinc.workshopmanager.domain.AppError(com.logunovinc.workshopmanager.domain.ErrorKind.INCOMPATIBLE_SERVER,"Сервер не поддерживает просмотр расхода"))
     suspend fun drawing(requestId: Long, lineId: Long): Outcome<ProfileDrawing> = Outcome.Failure(com.logunovinc.workshopmanager.domain.AppError(com.logunovinc.workshopmanager.domain.ErrorKind.INCOMPATIBLE_SERVER,"Сервер не поддерживает чертежи"))
-    suspend fun manufactureArea(order: WorkshopOrder): CommandOutcome = CommandOutcome.Rejected(null,com.logunovinc.workshopmanager.domain.AppError(com.logunovinc.workshopmanager.domain.ErrorKind.INCOMPATIBLE_SERVER,"Сервер не поддерживает расход по площади"))
+    suspend fun manufactureArea(order: WorkshopOrder,previewHash:String?=null): CommandOutcome = CommandOutcome.Rejected(null,com.logunovinc.workshopmanager.domain.AppError(com.logunovinc.workshopmanager.domain.ErrorKind.INCOMPATIBLE_SERVER,"Сервер не поддерживает расход по площади"))
     suspend fun sheetCatalog(): Outcome<List<com.logunovinc.workshopmanager.domain.stock.Product>> = Outcome.Success(emptyList())
     suspend fun contracts(): Outcome<WorkshopContracts>
     suspend fun orders(warehouseId: Long, view: OrderView, limit: Int = 50, offset: Long = 0): Outcome<Page<WorkshopOrder>>

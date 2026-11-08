@@ -1,6 +1,8 @@
 package com.logunovinc.workshopmanager.feature.tasks
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -70,6 +72,12 @@ fun OrderDetailScreen(state: OrderDetailUiState, onIntent: (OrderDetailIntent) -
         }
         if (order != null) {
             item {
+                state.areaPreview?.let { preview ->
+                    Text("Расход плоского листа",style=MaterialTheme.typography.titleMedium)
+                    preview.materials.forEach { Text("${it.productName}: ${it.areaM2.toPlainString()} м²") }
+                    Text("Всего ${preview.totalAreaM2.toPlainString()} м²")
+                }
+                state.previewError?.let { Text(it.message,color=MaterialTheme.colorScheme.error) }
                 Text(order.status.title(), style = MaterialTheme.typography.titleMedium)
                 Text(order.dueAt?.let { "Нужно к ${localDay(it)}" } ?: "Дата не указана")
                 if (order.comment.isNotBlank()) Text(order.comment)
@@ -89,7 +97,7 @@ fun OrderDetailScreen(state: OrderDetailUiState, onIntent: (OrderDetailIntent) -
             item {
                 if (order.canStart) Button(onClick = { onIntent(OrderDetailIntent.Start) }, modifier = Modifier.fillMaxWidth().testTag("order-start")) { Text("Взять в работу") }
                 if (order.canManufacture && !order.normUnspecified) Button(onClick = { onIntent(OrderDetailIntent.Manufacture) }, modifier = Modifier.fillMaxWidth().testTag("order-manufacture")) { Text("Изготовлено") }
-                if(order.canManufactureArea)Button(onClick={onIntent(OrderDetailIntent.ManufactureArea)},enabled=!state.loading&&!state.sending&&state.pending==null&&order.lines.all { line -> line.drawingVersion!=null&&state.drawings[line.id]?.version==line.drawingVersion },modifier=Modifier.fillMaxWidth().testTag("order-manufacture-area")){Text("Изготовлено · расход по чертежам")}
+                if(order.canManufactureArea)Button(onClick={onIntent(OrderDetailIntent.ManufactureArea)},enabled=!state.loading&&!state.sending&&state.pending==null&&state.areaPreview?.matches(order)==true&&order.lines.all { line -> line.drawingVersion!=null&&state.drawings[line.id]?.version==line.drawingVersion },modifier=Modifier.fillMaxWidth().testTag("order-manufacture-area")){Text("Изготовлено · расход по чертежам")}
                 if (order.canHandOver) Button(onClick = { onIntent(OrderDetailIntent.HandOver) }, modifier = Modifier.fillMaxWidth().testTag("order-hand-over")) { Text("Передано на склад") }
                 if (order.canReverseManufacture) OutlinedButton(onClick = { onIntent(OrderDetailIntent.ReverseManufacture) }, modifier = Modifier.fillMaxWidth().testTag("order-reverse-manufacture")) { Text("Отменить изготовление") }
                 if (order.canReverseHandOver) OutlinedButton(onClick = { onIntent(OrderDetailIntent.ReverseHandOver) }, modifier = Modifier.fillMaxWidth().testTag("order-reverse-hand-over")) { Text("Отменить передачу") }
@@ -106,7 +114,7 @@ fun OrderDetailScreen(state: OrderDetailUiState, onIntent: (OrderDetailIntent) -
                 OrderConfirm.HandOver -> "Передать всё на склад?"
                 is OrderConfirm.Reverse -> "Отменить шаг? Движения будут обращены, история сохранится."
             }) },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            text = { Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (confirm == OrderConfirm.Manufacture && order.needsActualSheet) {
                     Text("Нормы нет. Укажите фактический расход только плоского листа.")
                     OutlinedTextField(state.sheetQuery, { onIntent(OrderDetailIntent.SheetQuery(it)) }, label = { Text("Найти плоский лист") }, modifier = Modifier.fillMaxWidth())
@@ -116,7 +124,14 @@ fun OrderDetailScreen(state: OrderDetailUiState, onIntent: (OrderDetailIntent) -
                     TextButton(onClick = { onIntent(OrderDetailIntent.AddSheet) }) { Text("Добавить расход") }
                     state.materials.forEachIndexed { index, material -> Text("${material.sheets} лист. × ${QuantityFormatter.format(material.length)} м") ; TextButton(onClick = { onIntent(OrderDetailIntent.RemoveSheet(index)) }) { Text("Убрать") } }
                 } else if (confirm == OrderConfirm.Manufacture) Text("Сервер спишет лист по своей норме. Количество изделий не меняется.")
-                if(confirm==OrderConfirm.ManufactureArea)Text("Сервер рассчитает и спишет площадь плоского листа по сохранённым чертежам. Выпускается вся заявка.")
+                if(confirm==OrderConfirm.ManufactureArea){
+                    Text("Выпускается вся заявка. Списать плоский лист:")
+                    state.areaPreview?.let { preview ->
+                        preview.materials.forEach { Text("${it.productName}: ${it.areaM2.toPlainString()} м²") }
+                        Text("Итого ${preview.totalAreaM2.toPlainString()} м²")
+                        preview.lines.forEach { Text("${it.productName}: заготовка ${it.blankWidthMm} × ${it.lengthMm} мм, ${it.pieceQuantity.toPlainString()} шт · ${it.areaM2.toPlainString()} м²") }
+                    }
+                }
                 order.lines.forEach { Text("${it.productName}: ${QuantityFormatter.format(it.quantity)} ${it.unit}") }
             } },
             confirmButton = { Button(onClick = { onIntent(OrderDetailIntent.Confirm) }, enabled = !state.sending, modifier = Modifier.testTag("order-confirm")) { Text(if (state.sending) "Отправляем…" else "Подтвердить") } },

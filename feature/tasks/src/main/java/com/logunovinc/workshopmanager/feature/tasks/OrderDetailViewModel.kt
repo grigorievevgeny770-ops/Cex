@@ -22,6 +22,7 @@ data class OrderDetailUiState(
     val sheetLength: String = "", val sheetCount: String = "",
     val lastConfirmation: CommandConfirmation? = null,
     val drawings: Map<Long,ProfileDrawing> = emptyMap(), val drawingErrors: Map<Long,AppError> = emptyMap(),
+    val areaPreview:AreaPreview?=null,val previewError:AppError?=null,
 )
 sealed interface OrderConfirm { data object Start : OrderConfirm; data object Manufacture : OrderConfirm; data object ManufactureArea : OrderConfirm; data object HandOver : OrderConfirm; data class Reverse(val target: ReverseTarget) : OrderConfirm }
 sealed interface OrderDetailIntent {
@@ -74,7 +75,7 @@ class OrderDetailViewModel @Inject constructor(
             OrderDetailIntent.Retry -> retry()
             OrderDetailIntent.Start -> if (state.order?.canStart == true && state.pending == null) mutableState.update { it.copy(confirm = OrderConfirm.Start, error = null) }
             OrderDetailIntent.Manufacture -> if (state.order?.canManufacture == true && state.pending == null) mutableState.update { it.copy(confirm = OrderConfirm.Manufacture, error = null) }
-            OrderDetailIntent.ManufactureArea -> if (state.order?.canManufactureArea == true && state.pending == null && state.order.lines.all { line -> line.drawingVersion != null && state.drawings[line.id]?.version == line.drawingVersion }) mutableState.update { it.copy(confirm=OrderConfirm.ManufactureArea,error=null) }
+            OrderDetailIntent.ManufactureArea -> if (state.order?.canManufactureArea == true && state.pending == null && state.areaPreview?.matches(state.order)==true && state.order.lines.all { line -> line.drawingVersion != null && state.drawings[line.id]?.version == line.drawingVersion }) mutableState.update { it.copy(confirm=OrderConfirm.ManufactureArea,error=null) }
             OrderDetailIntent.HandOver -> if (state.order?.canHandOver == true && state.pending == null) mutableState.update { it.copy(confirm = OrderConfirm.HandOver, error = null) }
             OrderDetailIntent.ReverseManufacture -> if (state.order?.canReverseManufacture == true && state.pending == null) mutableState.update { it.copy(confirm = OrderConfirm.Reverse(ReverseTarget.MANUFACTURE), error = null) }
             OrderDetailIntent.ReverseHandOver -> if (state.order?.canReverseHandOver == true && state.pending == null) mutableState.update { it.copy(confirm = OrderConfirm.Reverse(ReverseTarget.HAND_OVER), error = null) }
@@ -88,10 +89,10 @@ class OrderDetailViewModel @Inject constructor(
             is OrderDetailIntent.RemoveSheet -> mutableState.update { it.copy(materials = it.materials.filterIndexed { index, _ -> index != intent.index }) }
         }
     }
-    private fun refresh() {
+    private fun refresh(clearError:Boolean=true) {
         val generation=++refreshGeneration
         viewModelScope.launch {
-            mutableState.update { it.copy(loading = true, error = null) }
+            mutableState.update { it.copy(loading = true, error = if(clearError)null else it.error,areaPreview=null,previewError=null) }
             when (val result = orders.order(orderId)) {
                 is Outcome.Failure -> if(generation==refreshGeneration) mutableState.update { it.copy(loading = false, error = result.error) }
                 is Outcome.Success -> {
@@ -102,7 +103,14 @@ class OrderDetailViewModel @Inject constructor(
                             is Outcome.Success -> if(drawing.value.version==line.drawingVersion) drawings[line.id]=drawing.value else failures[line.id]=AppError(ErrorKind.CONFLICT,"Чертёж изменился. Обновите заявку")
                         }
                     }
-                    if(generation==refreshGeneration) mutableState.update { it.copy(loading=false,order=result.value,drawings=drawings,drawingErrors=failures,confirm=null) }
+                    var preview:AreaPreview?=null;var previewError:AppError?=null
+                    if(result.value.canManufactureArea && failures.isEmpty() && result.value.lines.all { it.drawingVersion!=null && drawings[it.id]?.version==it.drawingVersion }) {
+                        when(val read=orders.areaPreview(orderId)) {
+                            is Outcome.Failure -> previewError=read.error
+                            is Outcome.Success -> if(read.value.matches(result.value))preview=read.value else previewError=AppError(ErrorKind.CONFLICT,"Расход или чертёж изменился. Обновите заявку")
+                        }
+                    }
+                    if(generation==refreshGeneration) mutableState.update { it.copy(loading=false,order=result.value,drawings=drawings,drawingErrors=failures,areaPreview=preview,previewError=previewError,confirm=null) }
                 }
             }
         }
@@ -138,7 +146,7 @@ class OrderDetailViewModel @Inject constructor(
             val result = when (confirm) {
                 OrderConfirm.Start -> orders.start(order)
                 OrderConfirm.Manufacture -> orders.manufacture(order, state.materials)
-                OrderConfirm.ManufactureArea -> orders.manufactureArea(order)
+                OrderConfirm.ManufactureArea -> orders.manufactureArea(order,state.areaPreview)
                 OrderConfirm.HandOver -> orders.handOver(order)
                 is OrderConfirm.Reverse -> orders.reverse(order, confirm.target)
             }
@@ -147,7 +155,7 @@ class OrderDetailViewModel @Inject constructor(
                 is CommandOutcome.Rejected -> mutableState.update { it.copy(sending = false, confirm = null, error = result.error) }
                 is CommandOutcome.Unresolved -> mutableState.update { it.copy(sending = false, confirm = null, pending = result.command, error = result.error) }
             }
-            refresh()
+            refresh(clearError=false)
         }
     }
     private fun retry() {
@@ -160,7 +168,7 @@ class OrderDetailViewModel @Inject constructor(
                 is CommandOutcome.Rejected -> mutableState.update { it.copy(retrying = false, error = result.error) }
                 is CommandOutcome.Unresolved -> mutableState.update { it.copy(retrying = false, pending = result.command, error = result.error) }
             }
-            refresh()
+            refresh(clearError=false)
         }
     }
 }
