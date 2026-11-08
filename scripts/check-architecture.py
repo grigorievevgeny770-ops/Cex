@@ -17,11 +17,11 @@ for module, dependencies in allowed.items():
     if not build.exists():
         failures.append(f'{module}: missing build file')
         continue
-    for dependency in re.findall(r'project\(\":([^\"]+)\"\)', build.read_text()):
+    for dependency in re.findall(r'project\(\":([^\"]+)\"\)', build.read_text(encoding='utf-8')):
         if dependency not in dependencies:
             failures.append(f'{module} -> {dependency}: forbidden dependency')
     for source in path.glob('src/**/*.kt'):
-        content = source.read_text()
+        content = source.read_text(encoding='utf-8')
         if module == 'domain' and re.search(r'^import (android\.|androidx\.|retrofit2\.|okhttp3\.|dagger\.|javax.inject\.)', content, re.M):
             failures.append(f'{source}: platform dependency in domain')
         if module.startswith('feature:') and re.search(r'^import com\.logunovinc\.workshopmanager\.data\.', content, re.M):
